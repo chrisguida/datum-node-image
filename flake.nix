@@ -27,6 +27,7 @@
         datum-gateway-convoy = final.callPackage ./pkgs/datum-gateway.nix { variant = "convoy"; };
         datum-gateway-iohzrd = final.callPackage ./pkgs/datum-gateway.nix { variant = "iohzrd"; };
         ratum-gateway = final.callPackage ./pkgs/ratum-gateway.nix { };
+        node-wizard = final.callPackage ./pkgs/node-wizard { };
       };
 
       mkHost =
@@ -37,6 +38,7 @@
             { nixpkgs.overlays = [ overlay ]; }
             self.nixosModules.datum-gateway
             self.nixosModules.blake2b-node
+            self.nixosModules.node-wizard
             ./hosts/common.nix
           ]
           ++ extraModules;
@@ -50,6 +52,7 @@
       nixosModules = {
         datum-gateway = ./modules/datum-gateway.nix;
         blake2b-node = ./modules/blake2b-node.nix;
+        node-wizard = ./modules/node-wizard.nix;
       };
 
       nixosConfigurations = {
@@ -76,6 +79,7 @@
             datum-gateway-convoy
             datum-gateway-iohzrd
             ratum-gateway
+            node-wizard
             ;
         }
         // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
@@ -91,6 +95,7 @@
           datum-gateway-convoy
           datum-gateway-iohzrd
           ratum-gateway
+          node-wizard
           ;
       });
     };

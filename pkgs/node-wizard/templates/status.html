@@ -1,0 +1,42 @@
+{{define "status"}}{{template "head" .}}
+<meta http-equiv="refresh" content="15">
+{{template "nav" .}}
+<main>
+{{$s := .Status}}
+<div class="card">
+<h1>{{.T "status_heading"}}</h1>
+
+<h2>{{.T "node"}}
+{{if eq $s.Node.Active "active"}}<span class="good">· {{.T "running"}}</span>{{else}}<span class="bad">· {{.T "stopped"}} ({{$s.Node.Active}})</span>{{end}}
+</h2>
+{{if $s.Node.Error}}<div class="err">{{$s.Node.Error}}</div>{{end}}
+<div class="row"><span class="k">{{.T "sync"}}</span><span class="v">{{$s.ProgressPct}}%</span></div>
+<div class="bar"><div style="width:{{$s.ProgressPct}}%"></div></div>
+<p class="note">{{if $s.Synced}}<span class="good">{{.T "synced"}}</span>{{else}}{{.T "syncing"}}{{end}}</p>
+<div class="row"><span class="k">{{.T "headers"}}</span><span class="v">{{$s.Node.Headers}}</span></div>
+<div class="row"><span class="k">{{.T "blocks"}}</span><span class="v">{{$s.Node.Blocks}}</span></div>
+<div class="row"><span class="k">{{.T "peers"}}</span><span class="v">{{$s.Node.Peers}}</span></div>
+<div class="row"><span class="k">{{.T "disk_free"}}</span><span class="v">{{$s.DiskFree}}</span></div>
+</div>
+
+<div class="card">
+<h2>{{.T "gateway"}}
+{{if eq $s.Gateway.Active "active"}}<span class="good">· {{.T "running"}}</span>{{else if $s.Gateway.Waiting}}<span class="warn">· {{.T "waiting_address"}}</span>{{else}}<span class="bad">· {{.T "stopped"}} ({{$s.Gateway.Active}})</span>{{end}}
+</h2>
+{{if $s.Gateway.Error}}<div class="err">{{$s.Gateway.Error}}</div>{{end}}
+<div class="row"><span class="k">{{.T "pool_connection"}}</span><span class="v">{{if $s.GatewayWaitingSync}}<span class="warn">{{.T "gateway_waiting_sync"}}</span>{{else if $s.Gateway.Connection}}{{$s.Gateway.Connection}}{{else}}{{.T "unknown"}}{{end}}</span></div>
+<div class="row"><span class="k">{{.T "hashrate"}}</span><span class="v">{{if $s.Gateway.Hashrate}}{{$s.Gateway.Hashrate}}{{else}}{{.T "not_available"}}{{end}}</span></div>
+<div class="row"><span class="k">{{.T "workers"}}</span><span class="v">{{$s.Gateway.Workers}}</span></div>
+<div class="row"><span class="k">{{.T "shares"}}</span><span class="v">{{if $s.Gateway.SharesAccepted}}{{$s.Gateway.SharesAccepted}} / {{$s.Gateway.SharesRejected}}{{else}}{{.T "not_available"}}{{end}}</span></div>
+</div>
+
+<div class="card">
+<h2>{{.T "miner_setup"}}</h2>
+<p><code>{{$s.StratumURL}}</code></p>
+<p class="note">{{.T "miner_help"}}</p>
+<div class="qr"><img src="/qr.png" alt="QR"></div>
+</div>
+
+<p class="note">{{.T "refresh_note"}} {{.T "updated"}}: {{$s.Updated}}</p>
+</main>
+{{template "foot" .}}{{end}}

@@ -52,6 +52,8 @@ in
   };
 
   services.blake2b-node.enable = true;
+  # first-boot setup page on https://<ip>/ (self-signed certificate), http redirects
+  services.node-wizard.enable = true;
 
   environment.systemPackages = with pkgs; [
     vim

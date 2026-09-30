@@ -5,8 +5,9 @@ A reproducible VPS image: a pruned **Bitcoin Knots** node on the BLAKE2b
 rebuild and compare. Flash it on a provider that imports images, or install it
 from a rescue shell on one that does not.
 
-Status: phase 1 (the flake, the packages, the image variants). No setup wizard
-yet; the payout address is set through a JSON file (see "First boot").
+Status: phase 2. The image boots to a browser setup page (Simplified Chinese
+and English) that asks for a setup code, a password, the payout address, the
+pool and a node name, then shows sync and mining status. No terminal needed.
 
 ## What is in the image
 
@@ -17,7 +18,8 @@ yet; the payout address is set through a JSON file (see "First boot").
 | Pool | picked from `data/pools.nix`, public key pinned | `data/pools.nix` |
 | Node settings | prune 10000, dbcache 1024, `blockmaxweight=785000`, block notifications by HTTP to the gateway, RPC cookie group-readable | `modules/blake2b-node.nix` |
 | Gateway settings | stratum on 0.0.0.0:23334, dashboard on 127.0.0.1:7152, vardiff floor 16384, pooled mining only, hasher time rolling off | `modules/blake2b-node.nix` |
-| Runtime overrides | `/var/lib/datum-gateway/settings.json`, deep-merged over the static config at every start | `modules/datum-gateway.nix` |
+| Setup page | `node-wizard`, HTTPS on 443 (self-signed) with HTTP on 80 redirecting; writes the gateway's runtime settings, reads the node and gateway locally; runs as its own unprivileged user | `pkgs/node-wizard/`, `modules/node-wizard.nix` |
+| Runtime overrides | `/var/lib/datum-wizard/gateway-settings.json` (written by the setup page), deep-merged over the static config at every gateway start | `modules/datum-gateway.nix` |
 | Access | SSH key only (root and `admin`), cloud-init for provider metadata, firewall: 22, 8333, 23334 | `hosts/common.nix` |
 
 ## Build
@@ -72,19 +74,26 @@ only in how the disk is laid out.
 
 ## First boot
 
-The node starts syncing on its own. The gateway waits until it has a payout
-address, then starts by itself:
+1. The server prints a **setup code** on its console (the provider's "View
+   console" button) once a minute until setup is done, together with the URL
+   to open. The code can also be pre-set by writing it to
+   `/var/lib/node-wizard/setup-code` (for example with cloud-init `write_files`).
+2. Open `https://<ip>/` in a browser. The certificate is self-signed, so the
+   browser warns once; choose Advanced and continue.
+3. Enter the setup code, choose a password, paste the payout address, pick a
+   pool (or solo, or a custom pool with its public key) and an optional node
+   name. The gateway starts by itself the moment this is saved; the node has
+   been syncing since boot.
+4. The status page shows sync progress, pool connection, hashrate and the
+   stratum URL to point miners at (`stratum+tcp://<ip>:23334`), with a QR code.
 
-```sh
-sudo tee /var/lib/datum-gateway/settings.json <<'EOF'
-{ "mining": { "pool_address": "bc1q...", "coinbase_tag_secondary": "my node" } }
-EOF
-```
+Everything can be changed later under Settings. The gateway's own dashboard
+stays on the server at `http://127.0.0.1:7152` (user `admin`, password shown
+under Settings > Advanced), reachable over an SSH tunnel.
 
-Anything in the gateway's JSON schema can go in that file; it wins over the
-static config. The gateway's dashboard is on `http://127.0.0.1:7152` (admin
-password in `/var/lib/datum-gateway/admin-password`); reach it over an SSH
-tunnel. Point miners at `stratum+tcp://<ip>:23334`.
+The setup page only ever writes `/var/lib/datum-wizard/gateway-settings.json`;
+anything in the gateway's JSON schema can also be put there by hand, and the
+gateway restarts when the file changes.
 
 Useful commands on the box:
 
@@ -136,6 +145,8 @@ flake.nix                 outputs: packages, nixosModules, nixosConfigurations, 
 pkgs/                     bitcoind-knots-bin, datum-gateway (convoy|iohzrd), ratum-gateway
 modules/datum-gateway.nix services.datum-gateway
 modules/blake2b-node.nix  services.blake2b-node (the profile)
+modules/node-wizard.nix   services.node-wizard (setup page + dashboard)
+pkgs/node-wizard/         the Go program behind it (templates, locales)
 data/pools.nix            pinned pool endpoints and keys
 hosts/common.nix          shared host config
 hosts/image.nix           disk-image variant (system.build.images.*)
@@ -145,8 +156,8 @@ hosts/authorized-keys.nix your SSH keys (rescue-mode path)
 
 ## Roadmap
 
-1. this flake (done when the image boots and mines)
-2. first-boot wizard (Simplified Chinese and English) behind TLS on 443
+1. this flake: done, boot-tested under QEMU (UEFI and BIOS)
+2. first-boot setup page (Simplified Chinese and English) on 443: done
 3. assumeutxo snapshot at the fork point, hash submitted to Knots; provider tests
 4. reproducibility CI on two runners, published hashes and attestations
 5. StartOS-via-CLI recipe and the templates proposal to Start9

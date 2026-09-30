@@ -1,0 +1,27 @@
+{{define "poolfields"}}
+<label for="payout_address">{{.T "payout_address"}}</label>
+<input id="payout_address" name="payout_address" value="{{index .Form "payout_address"}}" placeholder="bc1q…" autocomplete="off" spellcheck="false" required>
+<small>{{.T "payout_help"}}</small>
+
+<label for="pool">{{.T "pool"}}</label>
+<select id="pool" name="pool" onchange="document.getElementById('custom').style.display=this.value==='custom'?'block':'none'">
+{{$sel := index .Form "pool"}}
+{{range .Pools}}<option value="{{.Key}}" {{if eq .Key $sel}}selected{{end}}>{{.Name}} ({{.Host}})</option>
+{{end}}<option value="solo" {{if eq $sel "solo"}}selected{{end}}>{{.T "pool_solo"}}</option>
+<option value="custom" {{if eq $sel "custom"}}selected{{end}}>{{.T "pool_custom"}}</option>
+</select>
+<small>{{.T "pool_help"}}</small>
+
+<div id="custom" style="display:{{if eq $sel "custom"}}block{{else}}none{{end}}">
+<label for="custom_host">{{.T "custom_host"}}</label>
+<input id="custom_host" name="custom_host" value="{{index .Form "custom_host"}}" spellcheck="false">
+<label for="custom_port">{{.T "custom_port"}}</label>
+<input id="custom_port" name="custom_port" value="{{index .Form "custom_port"}}" inputmode="numeric">
+<label for="custom_pubkey">{{.T "custom_pubkey"}}</label>
+<input id="custom_pubkey" name="custom_pubkey" value="{{index .Form "custom_pubkey"}}" spellcheck="false">
+</div>
+
+<label for="tag">{{.T "tag"}}</label>
+<input id="tag" name="tag" value="{{index .Form "tag"}}" maxlength="32">
+<small>{{.T "tag_help"}}</small>
+{{end}}

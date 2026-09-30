@@ -1,0 +1,37 @@
+{{define "settings"}}{{template "head" .}}
+{{template "nav" .}}
+<main>
+<div class="card">
+<h1>{{.T "settings"}}</h1>
+{{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+{{if .Notice}}<div class="ok">{{.Notice}}</div>{{end}}
+<form method="post" action="/settings" autocomplete="off">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="action" value="gateway">
+{{template "poolfields" .}}
+<button type="submit">{{.T "save"}}</button>
+</form>
+</div>
+
+<div class="card">
+<h2>{{.T "change_password"}}</h2>
+<form method="post" action="/settings">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="action" value="password">
+<label for="current_password">{{.T "current_password"}}</label>
+<input id="current_password" name="current_password" type="password" required>
+<label for="new_password">{{.T "new_password"}}</label>
+<input id="new_password" name="new_password" type="password" minlength="8" required>
+<label for="password_confirm">{{.T "password_confirm"}}</label>
+<input id="password_confirm" name="password_confirm" type="password" minlength="8" required>
+<button type="submit">{{.T "save"}}</button>
+</form>
+</div>
+
+<div class="card">
+<h2>{{.T "advanced"}}</h2>
+<p class="note">{{.T "gateway_dashboard"}}: {{.T "gateway_dashboard_help"}}</p>
+<p><code>{{.AdminPassword}}</code></p>
+</div>
+</main>
+{{template "foot" .}}{{end}}

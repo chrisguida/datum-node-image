@@ -1,0 +1,29 @@
+{{define "setup"}}{{template "head" .}}
+<nav><span class="sp"></span>{{template "langswitch" .}}</nav>
+<main>
+<div class="card">
+<h1>{{.T "setup_heading"}}</h1>
+<p class="note">{{.T "setup_intro"}}</p>
+<p class="note">{{.T "cert_note"}}</p>
+{{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+<form method="post" action="/setup" autocomplete="off">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="language" value="{{.Lang}}">
+
+<label for="setup_code">{{.T "setup_code"}}</label>
+<input id="setup_code" name="setup_code" placeholder="XXXX-XXXX" autocapitalize="characters" spellcheck="false" required>
+<small>{{.T "setup_code_help"}}</small>
+
+<label for="password">{{.T "password"}}</label>
+<input id="password" name="password" type="password" minlength="8" required>
+<small>{{.T "password_help"}}</small>
+<label for="password_confirm">{{.T "password_confirm"}}</label>
+<input id="password_confirm" name="password_confirm" type="password" minlength="8" required>
+
+{{template "poolfields" .}}
+
+<button type="submit">{{.T "submit_setup"}}</button>
+</form>
+</div>
+</main>
+{{template "foot" .}}{{end}}
