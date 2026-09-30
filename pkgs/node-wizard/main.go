@@ -53,6 +53,8 @@ type config struct {
 	HTTPListen      string
 	ConsoleDevices  []string
 	SetupCodeFile   string
+	DashboardListen string
+	SampleInterval  time.Duration
 }
 
 type gatewayChoice struct {
@@ -79,6 +81,8 @@ type poolEntry struct {
 	Host   string `json:"host"`
 	Port   int    `json:"port"`
 	Pubkey string `json:"pubkey"`
+	URL    string `json:"url"`   // per-miner page; {address} is substituted
+	Stats  string `json:"stats"` // JSON endpoint in the ratum pool schema, if any
 }
 
 type App struct {
@@ -91,6 +95,8 @@ type App struct {
 	sessions   *sessions
 	limiter    *limiter
 	httpClient *http.Client
+	hashrate   *hashrateLog
+	poolCache  *poolStatsCache
 }
 
 type pageData struct {
@@ -105,6 +111,9 @@ type pageData struct {
 	Status        *statusView
 	AdminPassword string
 	SetupDone     bool
+	DashboardURL  string
+	Pool          *poolStatsView
+	HashrateSVG   template.HTML
 }
 
 func (p pageData) T(k string) string { return tr(p.Lang, k) }
@@ -142,6 +151,8 @@ func main() {
 	flag.StringVar(&cfg.HTTPListen, "http-listen", ":80", "HTTP listen address (redirects to HTTPS); empty disables")
 	flag.StringVar(&consoles, "console-devices", "/dev/tty1,/dev/ttyS0", "where to print the setup code")
 	flag.StringVar(&cfg.SetupCodeFile, "setup-code-file", "", "file holding a pre-set setup code (e.g. from cloud-init); default <state-dir>/setup-code")
+	flag.StringVar(&cfg.DashboardListen, "dashboard-listen", ":7443", "HTTPS listen address for the proxied gateway dashboard; empty disables")
+	flag.DurationVar(&cfg.SampleInterval, "sample-interval", 60*time.Second, "how often the gateway hashrate is sampled for the chart")
 	flag.Parse()
 	if consoles != "" {
 		cfg.ConsoleDevices = strings.Split(consoles, ",")
@@ -180,7 +191,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	app.hashrate = loadHashrateLog(filepath.Join(cfg.StateDir, "hashrate.json"))
+	app.poolCache = newPoolStatsCache()
 	go app.consoleLoop()
+	go app.sampleLoop()
+	if cfg.DashboardListen != "" {
+		go app.serveDashboard(certFile, keyFile)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.handleRoot)
@@ -452,6 +469,8 @@ func (a *App) csrfOK(r *http.Request) bool {
 	return err == nil && c.Value != "" && r.FormValue("csrf") == c.Value
 }
 
+func splitHostPort(s string) (string, string, error) { return net.SplitHostPort(s) }
+
 func hostOnly(r *http.Request) string {
 	h := r.Host
 	if host, _, err := net.SplitHostPort(h); err == nil {
@@ -700,6 +719,9 @@ func (a *App) statusView(host string) *statusView {
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	pd := a.page(w, r)
 	pd.Status = a.statusView(pd.Host)
+	pd.Pool = a.poolStatsView(pd.Lang)
+	pd.HashrateSVG = a.hashrateSVG()
+	pd.DashboardURL = a.dashboardURL(pd.Host)
 	a.render(w, "status", pd)
 }
 
@@ -714,6 +736,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	g := a.state.Gateway
 	pd.AdminPassword = a.state.GatewayAdminPassword
 	a.mu.Unlock()
+	pd.DashboardURL = a.dashboardURL(pd.Host)
 	pd.Form["payout_address"] = g.Address
 	pd.Form["tag"] = g.Tag
 	pd.Form["pool"] = g.Pool

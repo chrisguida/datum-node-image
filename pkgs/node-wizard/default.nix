@@ -16,6 +16,9 @@ buildGoModule {
       ./address.go
       ./i18n.go
       ./node.go
+      ./poolstats.go
+      ./hashrate.go
+      ./dashboard.go
       ./locales
       ./templates
     ];

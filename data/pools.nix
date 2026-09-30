@@ -7,6 +7,8 @@
 {
   omegapool = {
     name = "OmegaPool";
+    url = "https://pool.iohzrd.tech/miners";
+    stats = "https://pool.iohzrd.tech/stats.json";
     # iohzrd's pool (ratum backend). https://pool.iohzrd.tech/connect fills the
     # values from https://pool.iohzrd.tech/stats.json (.pool.datum_port, .pool.pubkey);
     # copied 2026-09-30, pool version 0.1.54, fee 0.5%.
@@ -17,6 +19,8 @@
 
   paperclip = {
     name = "Paperclip";
+    url = "https://pool.paperclippool.xyz/#address-dashboard";
+    stats = "https://pool.paperclippool.xyz/api/status";
     # https://pool.paperclippool.xyz/ fills the values from /api/status
     # (.stats.pool.datum_port, .stats.pool.pubkey); copied 2026-09-30, 0% DATUM fee.
     host = "pool.paperclippool.xyz";
@@ -26,6 +30,7 @@
 
   convoy = {
     name = "CONVOY";
+    url = "https://convoy.xyz/stats";
     # https://convoy.xyz/getstarted (2026-09-30)
     host = "datum-beta1.mine.convoy.xyz";
     port = 28915;
@@ -34,6 +39,7 @@
 
   alphapool = {
     name = "AlphaPool";
+    url = "https://xbt.alphapool.tech/miner/{address}";
     # https://xbt.alphapool.tech/start (2026-09-25); requires the iohzrd gateway fork
     host = "us2.alphapool.tech";
     port = 28916;
@@ -42,6 +48,7 @@
 
   rabid = {
     name = "Rabid Pool (PPLNS)";
+    url = "https://pool.rabidmining.com/xbt#stats";
     # https://pool.rabidmining.com/xbt#datum, PPLNS endpoint (2026-09-30);
     # their SOLO endpoint is port 28926 with a different key
     host = "xbt.rabidmining.com";
@@ -51,6 +58,7 @@
 
   rabid-solo = {
     name = "Rabid Pool (SOLO)";
+    url = "https://pool.rabidmining.com/xbt#stats";
     host = "xbt.rabidmining.com";
     port = 28926;
     pubkey = "c85f07849c41ace0673e61176f8e5984f3e7b1683227e76848f6e844800df3516096acbd2e99534d2380a07706ade2fc21278d4d975c4e99249573701cd57e6b";

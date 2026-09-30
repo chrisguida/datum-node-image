@@ -28,7 +28,26 @@
 <div class="row"><span class="k">{{.T "hashrate"}}</span><span class="v">{{if $s.Gateway.Hashrate}}{{$s.Gateway.Hashrate}}{{else}}{{.T "not_available"}}{{end}}</span></div>
 <div class="row"><span class="k">{{.T "workers"}}</span><span class="v">{{$s.Gateway.Workers}}</span></div>
 <div class="row"><span class="k">{{.T "shares"}}</span><span class="v">{{if $s.Gateway.SharesAccepted}}{{$s.Gateway.SharesAccepted}} / {{$s.Gateway.SharesRejected}}{{else}}{{.T "not_available"}}{{end}}</span></div>
+{{if .HashrateSVG}}<p class="note">{{.T "hashrate_24h"}}</p>{{.HashrateSVG}}{{end}}
+{{if .DashboardURL}}<p><a href="{{.DashboardURL}}" target="_blank" rel="noopener">{{.T "gateway_dashboard_link"}}</a></p>{{end}}
 </div>
+
+{{if .Pool}}<div class="card">
+<h2>{{.T "pool_stats"}} · {{.Pool.Name}}</h2>
+{{if .Pool.Error}}<div class="err">{{.T "stats_unavailable"}}: {{.Pool.Error}}</div>{{end}}
+{{if and .Pool.HasStats (not .Pool.Error)}}
+{{if .Pool.InWindow}}
+<div class="row"><span class="k">{{.T "window_share"}}</span><span class="v">{{.Pool.Share}}</span></div>
+<div class="row"><span class="k">{{.T "pool_hashrate_yours"}}</span><span class="v">{{.Pool.YourHashrate}}</span></div>
+<div class="row"><span class="k">{{.T "payout_per_block"}}</span><span class="v">{{.Pool.Payout}}</span></div>
+{{else}}<p class="note">{{.T "not_in_window"}}</p>{{end}}
+<div class="row"><span class="k">{{.T "pool_hashrate"}}</span><span class="v">{{.Pool.PoolHashrate}}{{if .Pool.NetworkShare}} ({{.Pool.NetworkShare}}){{end}}</span></div>
+<div class="row"><span class="k">{{.T "blocks_found"}}</span><span class="v">{{.Pool.Blocks}}</span></div>
+<div class="row"><span class="k">{{.T "last_block"}}</span><span class="v">{{.Pool.LastBlock}}</span></div>
+<div class="row"><span class="k">{{.T "pool_fee"}}</span><span class="v">{{.Pool.Fee}}</span></div>
+{{end}}
+{{if .Pool.URL}}<p><a href="{{.Pool.URL}}" target="_blank" rel="noopener">{{.T "pool_link"}}</a></p>{{end}}
+</div>{{end}}
 
 <div class="card">
 <h2>{{.T "miner_setup"}}</h2>

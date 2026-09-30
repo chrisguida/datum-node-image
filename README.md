@@ -20,7 +20,7 @@ pool and a node name, then shows sync and mining status. No terminal needed.
 | Gateway settings | stratum on 0.0.0.0:23334, dashboard on 127.0.0.1:7152, vardiff floor 16384, pooled mining only, hasher time rolling off | `modules/blake2b-node.nix` |
 | Setup page | `node-wizard`, HTTPS on 443 (self-signed) with HTTP on 80 redirecting; writes the gateway's runtime settings, reads the node and gateway locally; runs as its own unprivileged user | `pkgs/node-wizard/`, `modules/node-wizard.nix` |
 | Runtime overrides | `/var/lib/datum-wizard/gateway-settings.json` (written by the setup page), deep-merged over the static config at every gateway start | `modules/datum-gateway.nix` |
-| Access | SSH key only (root and `admin`), cloud-init for provider metadata, firewall: 22, 8333, 23334 | `hosts/common.nix` |
+| Access | SSH key only (root and `admin`), cloud-init for provider metadata, firewall: 22, 80, 443, 7443, 8333, 23334 | `hosts/common.nix`, `modules/node-wizard.nix` |
 
 ## Build
 
@@ -84,12 +84,17 @@ only in how the disk is laid out.
    pool (or solo, or a custom pool with its public key) and an optional node
    name. The gateway starts by itself the moment this is saved; the node has
    been syncing since boot.
-4. The status page shows sync progress, pool connection, hashrate and the
-   stratum URL to point miners at (`stratum+tcp://<ip>:23334`), with a QR code.
+4. The status page shows the node (sync, peers, disk), the gateway (pool
+   connection, hashrate with a 24-hour chart, miners, shares), what the pool
+   reports for your address (share of the next block, payout per block, pool
+   hashrate, blocks found, luck; OmegaPool and Paperclip publish this, the
+   others get a link to their page), and the stratum URL to point miners at
+   (`stratum+tcp://<ip>:23334`) with a QR code.
 
 Everything can be changed later under Settings. The gateway's own dashboard
-stays on the server at `http://127.0.0.1:7152` (user `admin`, password shown
-under Settings > Advanced), reachable over an SSH tunnel.
+(per-miner tables, current job, its config page) is proxied at
+`https://<ip>:7443/` for signed-in browsers; its protected pages ask for user
+`admin` and the password shown under Settings > Advanced.
 
 The setup page only ever writes `/var/lib/datum-wizard/gateway-settings.json`;
 anything in the gateway's JSON schema can also be put there by hand, and the

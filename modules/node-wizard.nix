@@ -40,6 +40,12 @@ in
       description = "HTTP port that redirects to HTTPS.";
     };
 
+    dashboardPort = lib.mkOption {
+      type = lib.types.port;
+      default = 7443;
+      description = "HTTPS port where the gateway's own dashboard is proxied, behind the wizard's login.";
+    };
+
     pools = lib.mkOption {
       type = lib.types.attrsOf lib.types.attrs;
       default = import ../data/pools.nix;
@@ -106,6 +112,7 @@ in
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [
       cfg.port
       cfg.httpPort
+      cfg.dashboardPort
     ];
 
     systemd.services.node-wizard = {
@@ -134,6 +141,7 @@ in
           "-stratum-port ${toString (node.stratumPort or 23334)}"
           "-listen :${toString cfg.port}"
           "-http-listen :${toString cfg.httpPort}"
+          "-dashboard-listen :${toString cfg.dashboardPort}"
           "-console-devices ${lib.concatStringsSep "," cfg.consoleDevices}"
         ];
         Restart = "on-failure";

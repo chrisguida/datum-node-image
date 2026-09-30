@@ -30,7 +30,7 @@
 
 <div class="card">
 <h2>{{.T "advanced"}}</h2>
-<p class="note">{{.T "gateway_dashboard"}}: {{.T "gateway_dashboard_help"}}</p>
+<p class="note">{{.T "gateway_dashboard"}}: {{if .DashboardURL}}<a href="{{.DashboardURL}}" target="_blank" rel="noopener">{{.DashboardURL}}</a> {{end}}{{.T "gateway_dashboard_help"}}</p>
 <p><code>{{.AdminPassword}}</code></p>
 </div>
 </main>
