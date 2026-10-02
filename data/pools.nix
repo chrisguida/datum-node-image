@@ -37,33 +37,6 @@
     pubkey = "dbb11fa0c2b5403e4f798fa6071bb97e6079d219598366032fdf2ae01962b13c5e66e2be7d6b008f0b2603f3e6f6fc64768fa786c8129c46d3e30a5867734b62";
   };
 
-  alphapool = {
-    name = "AlphaPool";
-    url = "https://xbt.alphapool.tech/miner/{address}";
-    # https://xbt.alphapool.tech/start (2026-09-25); requires the iohzrd gateway fork
-    host = "us2.alphapool.tech";
-    port = 28916;
-    pubkey = "b831b2d6f1eaedb3da5b9e3702728edea0a32d6ce783a1452b2861c4d1b74d6b4c2ad5461bcf43485a6bac2cedf8da43d51164262ef6bcdb27f2242ada066d29";
-  };
-
-  rabid = {
-    name = "Rabid Pool (PPLNS)";
-    url = "https://pool.rabidmining.com/xbt#stats";
-    # https://pool.rabidmining.com/xbt#datum, PPLNS endpoint (2026-09-30);
-    # their SOLO endpoint is port 28926 with a different key
-    host = "xbt.rabidmining.com";
-    port = 28916;
-    pubkey = "9f41d02bfaf09d18d0db09711912a946ed2698c2f5507ab4f79a68655fb1f476e5127f60501b739eb6e89606bb0267f74750ebb55a75c7ef21434bf60ca66920";
-  };
-
-  rabid-solo = {
-    name = "Rabid Pool (SOLO)";
-    url = "https://pool.rabidmining.com/xbt#stats";
-    host = "xbt.rabidmining.com";
-    port = 28926;
-    pubkey = "c85f07849c41ace0673e61176f8e5984f3e7b1683227e76848f6e844800df3516096acbd2e99534d2380a07706ade2fc21278d4d975c4e99249573701cd57e6b";
-  };
-
   # Not listed yet, keys still to be obtained from the operators:
   #   maveth   RIPTIDE, riptide.maveth.ca:29120 (0%); the page says to rely on the
   #            gateway's key auto-fetch and does not publish the key
