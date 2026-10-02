@@ -82,7 +82,8 @@ type poolEntry struct {
 	Port   int    `json:"port"`
 	Pubkey string `json:"pubkey"`
 	URL    string `json:"url"`   // per-miner page; {address} is substituted
-	Stats  string `json:"stats"` // JSON endpoint in the ratum pool schema, if any
+	Stats  string `json:"stats"` // JSON endpoint (ratum pool schema) or API base (lazarus schema)
+	Schema string `json:"schema"` // "" or "ratum" (one JSON document), "lazarus" (/pool, /miner/<addr>, /blocks)
 }
 
 type App struct {

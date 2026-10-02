@@ -28,6 +28,18 @@
     pubkey = "eb9c7885044ca6dc7a4af3761cb739cbf88e88f6852e6c4b4f754710ec0cc8c9fb4a78cb35bbfe6ac4ec83feb0030e5e8ac065baf87d9ab21489011f3d865478";
   };
 
+  lazarus = {
+    # https://pool.lazarus-xbt.xyz/connect; values from https://pool.lazarus-xbt.xyz/api/pool
+    # (.datum.pool_pubkey), DATUM host from the connect page; copied 2026-10-02, 0% DATUM fee.
+    name = "Lazarus";
+    host = "datum.lazarus-xbt.xyz";
+    port = 28915;
+    pubkey = "29120606bbbfdeb0dcb259d13ed1fba9e6ff198ff6a0152cffb7608dc1c266bd17532393738aee7edf9aa0c9ec93b835256971f186da878f77fb3ed273dff30a";
+    url = "https://pool.lazarus-xbt.xyz/miner/{address}";
+    stats = "https://pool.lazarus-xbt.xyz/api";
+    schema = "lazarus";
+  };
+
   convoy = {
     name = "CONVOY";
     url = "https://convoy.xyz/stats";

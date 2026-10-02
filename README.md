@@ -15,7 +15,7 @@ pool and a node name, then shows sync and mining status. No terminal needed.
 |---|---|---|
 | Node | Bitcoin Knots 29.4.2.knots20260508, the official Guix-built tarball from bitcoinknots.org, hashes as published in its SHA256SUMS, patched with autoPatchelf | `pkgs/bitcoind-knots-bin.nix` |
 | Gateway | CONVOY's `datum_gateway` (default); iohzrd's fork and the static `ratum-gateway` are packaged and selectable | `pkgs/datum-gateway.nix`, `pkgs/ratum-gateway.nix` |
-| Pool | picked from `data/pools.nix`, public key pinned | `data/pools.nix` |
+| Pool | OmegaPool (default), Paperclip, Lazarus, CONVOY from `data/pools.nix`, public key pinned; solo or a custom pool from the setup page | `data/pools.nix` |
 | Node settings | prune 10000, dbcache 1024, `blockmaxweight=785000`, block notifications by HTTP to the gateway, RPC cookie group-readable | `modules/blake2b-node.nix` |
 | Gateway settings | stratum on 0.0.0.0:23334, dashboard on 127.0.0.1:7152, vardiff floor 16384, pooled mining only, hasher time rolling off | `modules/blake2b-node.nix` |
 | Setup page | `node-wizard`, HTTPS on 443 (self-signed) with HTTP on 80 redirecting; writes the gateway's runtime settings, reads the node and gateway locally; runs as its own unprivileged user | `pkgs/node-wizard/`, `modules/node-wizard.nix` |
@@ -87,8 +87,8 @@ only in how the disk is laid out.
 4. The status page shows the node (sync, peers, disk), the gateway (pool
    connection, hashrate with a 24-hour chart, miners, shares), what the pool
    reports for your address (share of the next block, payout per block, pool
-   hashrate, blocks found, luck; OmegaPool and Paperclip publish this, the
-   others get a link to their page), and the stratum URL to point miners at
+   hashrate, blocks found, luck; OmegaPool, Paperclip and Lazarus publish this,
+   the others get a link to their page), and the stratum URL to point miners at
    (`stratum+tcp://<ip>:23334`) with a QR code.
 
 Everything can be changed later under Settings. The gateway's own dashboard

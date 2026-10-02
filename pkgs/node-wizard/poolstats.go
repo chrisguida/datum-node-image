@@ -72,7 +72,11 @@ func (a *App) poolStats() *poolStats {
 		return &v
 	}
 	a.poolCache.mu.Unlock()
-	fillPoolStats(ps, entry.Stats, g.Address)
+	if entry.Schema == "lazarus" {
+		fillLazarusStats(ps, entry.Stats, g.Address)
+	} else {
+		fillPoolStats(ps, entry.Stats, g.Address)
+	}
 	a.poolCache.mu.Lock()
 	a.poolCache.key, a.poolCache.at, a.poolCache.val = key, time.Now(), ps
 	a.poolCache.mu.Unlock()
@@ -159,6 +163,92 @@ func fillPoolStats(ps *poolStats, url, address string) {
 				break
 			}
 		}
+	}
+}
+
+func getJSON(client *http.Client, url string) (map[string]any, error) {
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var m map[string]any
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func num(m map[string]any, key string) (float64, bool) {
+	f, ok := m[key].(float64)
+	return f, ok
+}
+
+// fillLazarusStats reads Lazarus's own API: /pool, /miner/<address>, /blocks.
+func fillLazarusStats(ps *poolStats, base, address string) {
+	client := &http.Client{Timeout: 8 * time.Second}
+	base = strings.TrimRight(base, "/")
+	pool, err := getJSON(client, base+"/pool")
+	if err != nil {
+		ps.Error = err.Error()
+		return
+	}
+	ps.FetchedAt = time.Now()
+	if f, ok := num(pool, "pool_hr_ghs"); ok {
+		ps.PoolHashrate = fmtHashrate(f * 1e9)
+	}
+	if f, ok := num(pool, "pool_share"); ok {
+		ps.NetworkShare = fmt.Sprintf("%.2f%%", f*100)
+	}
+	if f, ok := num(pool, "blocks_found"); ok {
+		ps.BlocksFound = int64(f)
+	}
+	if f, ok := num(pool, "luck_percent"); ok {
+		ps.LuckPct = f
+	}
+	if fees, ok := pool["fees"].(map[string]any); ok {
+		if f, ok := num(fees, "datum_percent"); ok {
+			ps.FeePct = strconv.FormatFloat(f, 'f', -1, 64) + "%"
+		}
+	}
+	if blocks, err := getJSON(client, base+"/blocks"); err == nil {
+		if list, ok := blocks["blocks"].([]any); ok {
+			for _, b := range list {
+				bm, ok := b.(map[string]any)
+				if !ok {
+					continue
+				}
+				if p, _ := bm["pool"].(string); !strings.EqualFold(p, "Lazarus") {
+					continue
+				}
+				if h, ok := num(bm, "height"); ok && int64(h) > ps.LastBlockHeight {
+					ps.LastBlockHeight = int64(h)
+					if t, ok := num(bm, "timestamp"); ok {
+						ps.LastBlockAt = time.Unix(int64(t), 0)
+					}
+				}
+			}
+		}
+	}
+	miner, err := getJSON(client, base+"/miner/"+address)
+	if err != nil {
+		return
+	}
+	if known, _ := miner["known"].(bool); !known {
+		return
+	}
+	if f, ok := num(miner, "window_percent"); ok && f > 0 {
+		ps.InWindow = true
+		ps.SharePct = f
+	}
+	if f, ok := num(miner, "hr_ghs"); ok {
+		ps.YourHashrate = fmtHashrate(f * 1e9)
+	}
+	if f, ok := num(miner, "window_sats"); ok {
+		ps.PayoutPerBlock = fmtCoins(int64(f))
+	}
+	if online, ok := miner["online"].(bool); ok {
+		ps.Payable = online
 	}
 }
 
