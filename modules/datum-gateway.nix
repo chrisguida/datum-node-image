@@ -1,6 +1,6 @@
 # services.datum-gateway
 #
-# Runs one DATUM gateway (a C fork or ratum-gateway; all read the same JSON
+# Runs one DATUM gateway (a C build or ratum-gateway; all read the same JSON
 # config) against a local services.bitcoind.<instance>. The static config from
 # Nix is deep-merged under a runtime settings file that the setup wizard, or a
 # person, writes later; the service restarts by itself when that file changes

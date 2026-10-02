@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// validateAddress accepts the address forms a coinbase output can pay on this
-// chain (mainnet parameters): bech32 v0 (P2WPKH, P2WSH), bech32m v1+ (P2TR)
+// validateAddress accepts the bitcoin address forms a coinbase output can pay
+// (mainnet parameters): bech32 v0 (P2WPKH, P2WSH), bech32m v1+ (P2TR)
 // and base58check P2PKH / P2SH.
 func validateAddress(addr string) error {
 	addr = strings.TrimSpace(addr)

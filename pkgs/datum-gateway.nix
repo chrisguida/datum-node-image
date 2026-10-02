@@ -1,9 +1,9 @@
-# The C DATUM gateway, in the two forks that speak the BLAKE2b chain.
+# The C DATUM gateway, in the two builds that speak bitcoin's BLAKE2b proof of work.
 #
 #   convoy  - CONVOYMining/datum_gateway master (carries the BLAKE2b fixes first)
 #   iohzrd  - iohzrd/datum_gateway at the commit some pools pin (AlphaPool)
 #
-# Both are OCEAN's datum_gateway 0.4.1 plus the fork's changes; same config schema.
+# Both are OCEAN's datum_gateway 0.4.1 plus each build's changes; same config schema.
 {
   lib,
   stdenv,
@@ -60,7 +60,7 @@ stdenv.mkDerivation {
   cmakeBuildType = "Release";
 
   meta = {
-    description = "DATUM gateway (${variant} fork) for the BLAKE2b (BIP-110) chain";
+    description = "DATUM gateway for bitcoin (${variant} build)";
     homepage = "https://github.com/${v.owner}/datum_gateway";
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;

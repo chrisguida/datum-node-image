@@ -1,5 +1,5 @@
 {
-  description = "Reproducible VPS image: pruned Bitcoin Knots on the BLAKE2b (BIP-110) chain + DATUM gateway";
+  description = "Reproducible VPS image: pruned Bitcoin Knots + DATUM gateway (bitcoin, BLAKE2b proof of work)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

@@ -1,7 +1,7 @@
 # services.blake2b-node
 #
-# The opinionated profile: a pruned Bitcoin Knots node on the BLAKE2b (BIP-110)
-# chain plus a DATUM gateway pointed at a pinned pool. Everything a template
+# The opinionated profile: a pruned Bitcoin Knots node plus a DATUM gateway
+# pointed at a pinned pool. Everything a template
 # user would change is an option here; the payout address may also be left
 # empty and set at runtime through the gateway's settings file.
 {
@@ -43,7 +43,7 @@ let
 in
 {
   options.services.blake2b-node = {
-    enable = lib.mkEnableOption "a pruned Knots node + DATUM gateway on the BLAKE2b chain";
+    enable = lib.mkEnableOption "a pruned bitcoin (Knots) node + DATUM gateway";
 
     knotsPackage = lib.mkOption {
       type = lib.types.package;
@@ -89,7 +89,7 @@ in
     payoutAddress = lib.mkOption {
       type = lib.types.str;
       default = "";
-      description = "Address on this chain that the coinbase pays. Leave empty to set it at runtime in the gateway's settings file; the gateway waits until it is set.";
+      description = "Bitcoin address the coinbase pays. Leave empty to set it at runtime in the gateway's settings file; the gateway waits until it is set.";
     };
 
     coinbaseTag = lib.mkOption {
@@ -132,7 +132,7 @@ in
       extraConfig = ''
         server=1
         listen=1
-        # BLAKE2b chain: 800,000 WU block limit; leave room for the pool's payout tx
+        # bitcoin's 800,000 WU block limit; leave room for the pool's payout tx
         blockmaxweight=785000
         # the gateway reads the RPC cookie as a member of the bitcoind group
         rpccookieperms=group

@@ -60,7 +60,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    description = "Bitcoin Knots (official release binaries), the BLAKE2b (BIP-110) chain build";
+    description = "Bitcoin Knots (official release binaries)";
     homepage = "https://bitcoinknots.org/";
     license = lib.licenses.mit;
     platforms = builtins.attrNames perSystem;

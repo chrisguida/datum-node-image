@@ -1,8 +1,11 @@
 # datum-node-image
 
-A reproducible VPS image: a pruned **Bitcoin Knots** node on the BLAKE2b
-(BIP-110) chain plus a **DATUM gateway**, built from a Nix flake anyone can
-rebuild and compare. Flash it on a provider that imports images, or install it
+A reproducible VPS image: a pruned **Bitcoin Knots** node plus a **DATUM
+gateway**, built from a Nix flake anyone can rebuild and compare.
+
+Bitcoin here is the chain with BLAKE2b proof of work (BIP-110), the one
+Bitcoin Knots 29.4 follows. Bitcoin Core follows the sha256 chain and does
+not work with this image. Flash it on a provider that imports images, or install it
 from a rescue shell on one that does not.
 
 Status: phase 2. The image boots to a browser setup page (Simplified Chinese
@@ -14,7 +17,7 @@ pool and a node name, then shows sync and mining status. No terminal needed.
 | Piece | Choice | Where |
 |---|---|---|
 | Node | Bitcoin Knots 29.4.2.knots20260508, the official Guix-built tarball from bitcoinknots.org, hashes as published in its SHA256SUMS, patched with autoPatchelf | `pkgs/bitcoind-knots-bin.nix` |
-| Gateway | CONVOY's `datum_gateway` (default); iohzrd's fork and the static `ratum-gateway` are packaged and selectable | `pkgs/datum-gateway.nix`, `pkgs/ratum-gateway.nix` |
+| Gateway | CONVOY's `datum_gateway` (default); iohzrd's build and the static `ratum-gateway` are packaged and selectable | `pkgs/datum-gateway.nix`, `pkgs/ratum-gateway.nix` |
 | Pool | OmegaPool (default), Paperclip, Lazarus, CONVOY from `data/pools.nix`, public key pinned; solo or a custom pool from the setup page | `data/pools.nix` |
 | Node settings | prune 10000, dbcache 1024, `blockmaxweight=785000`, block notifications by HTTP to the gateway, RPC cookie group-readable | `modules/blake2b-node.nix` |
 | Gateway settings | stratum on 0.0.0.0:23334, dashboard on 127.0.0.1:7152, vardiff floor 16384, pooled mining only, hasher time rolling off | `modules/blake2b-node.nix` |
@@ -163,6 +166,6 @@ hosts/authorized-keys.nix your SSH keys (rescue-mode path)
 
 1. this flake: done, boot-tested under QEMU (UEFI and BIOS)
 2. first-boot setup page (Simplified Chinese and English) on 443: done
-3. assumeutxo snapshot at the fork point, hash submitted to Knots; provider tests
+3. recent assumeutxo snapshot, hash submitted to Knots; provider tests
 4. reproducibility CI on two runners, published hashes and attestations
 5. StartOS-via-CLI recipe and the templates proposal to Start9

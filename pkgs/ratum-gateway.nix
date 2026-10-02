@@ -47,7 +47,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    description = "DATUM gateway for the BLAKE2b (BIP-110) chain, Rust implementation (static binary)";
+    description = "DATUM gateway for bitcoin, Rust implementation (static binary)";
     homepage = "https://github.com/iohzrd/ratum";
     license = lib.licenses.mit;
     platforms = builtins.attrNames perSystem;

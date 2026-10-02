@@ -1,4 +1,4 @@
-# DATUM pools on the BLAKE2b (BIP-110) chain, with their server public keys pinned.
+# Bitcoin DATUM pools, with their server public keys pinned.
 #
 # A pinned key is what makes the gateway refuse an impostor: the CONVOY build
 # with an empty pool_pubkey accepts whatever key the far end presents. Every
