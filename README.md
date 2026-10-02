@@ -111,6 +111,42 @@ journalctl -fu bitcoind-blake2b   # node log
 journalctl -fu datum-gateway      # gateway log
 ```
 
+## Fast start (assumeutxo)
+
+With `services.blake2b-node.fastStart` enabled, the first boot downloads a
+published UTXO snapshot instead of validating all history first:
+
+```nix
+services.blake2b-node.fastStart = {
+  enable = true;
+  height = 975000;                 # snapshot base height (in Knots' chainparams)
+  blockhash = "0000...";           # block hash at that height
+  utxoHash = "...";                # hash_serialized from dumptxoutset
+  chainTxCount = 1300000000;       # nchaintx from dumptxoutset
+  url = "https://example/utxo-975000.dat";
+  sha256 = "...";                  # of the file
+  sizeBytes = 9500000000;
+};
+```
+
+What happens on the box: once bitcoind has the block headers past the
+snapshot, a oneshot service downloads the file (resumable), checks its SHA256,
+runs `loadtxoutset`, and deletes it. The node then serves templates as soon as
+it catches up to the tip, usually under an hour on a 2 vCPU VPS, while the
+full history is validated in the background over the following days. Any
+failure (disk, download, checksum) leaves the node syncing normally. The
+setup page shows each phase.
+
+`loadtxoutset` only accepts snapshots whose height and hash are compiled into
+Knots. Until the entry is merged upstream, `patchKnots = true` (the default)
+builds Knots from nixpkgs' verified source with that one entry added
+(`pkgs/bitcoind-knots-patched.nix`); set it to `false` once a Knots release
+ships the entry, and the official release tarball is used again.
+
+The snapshot itself comes from a synced unpruned node:
+`bitcoin-cli -named dumptxoutset path=utxo.dat type=latest` prints the
+height, block hash, UTXO hash and tx count to put in the options above.
+
 ## Configuration
 
 Everything a template user would change is an option of
@@ -154,6 +190,8 @@ pkgs/                     bitcoind-knots-bin, datum-gateway (convoy|iohzrd), rat
 modules/datum-gateway.nix services.datum-gateway
 modules/blake2b-node.nix  services.blake2b-node (the profile)
 modules/node-wizard.nix   services.node-wizard (setup page + dashboard)
+modules/fast-start.nix    services.blake2b-node.fastStart (assumeutxo at first boot)
+pkgs/bitcoind-knots-patched.nix Knots from source with the snapshot in chainparams
 pkgs/node-wizard/         the Go program behind it (templates, locales)
 data/pools.nix            pinned pool endpoints and keys
 hosts/common.nix          shared host config
@@ -166,6 +204,6 @@ hosts/authorized-keys.nix your SSH keys (rescue-mode path)
 
 1. this flake: done, boot-tested under QEMU (UEFI and BIOS)
 2. first-boot setup page (Simplified Chinese and English) on 443: done
-3. recent assumeutxo snapshot, hash submitted to Knots; provider tests
+3. recent assumeutxo snapshot, hash submitted to Knots; provider tests: in progress
 4. reproducibility CI on two runners, published hashes and attestations
 5. StartOS-via-CLI recipe and the templates proposal to Start9
