@@ -28,6 +28,8 @@
         datum-gateway-iohzrd = final.callPackage ./pkgs/datum-gateway.nix { variant = "iohzrd"; };
         ratum-gateway = final.callPackage ./pkgs/ratum-gateway.nix { };
         node-wizard = final.callPackage ./pkgs/node-wizard { };
+        # a function: { height, blockhash, utxoHash, chainTxCount } -> Knots with that snapshot in chainparams
+        bitcoind-knots-patched = final.callPackage ./pkgs/bitcoind-knots-patched.nix { };
       };
 
       mkHost =
@@ -39,6 +41,7 @@
             self.nixosModules.datum-gateway
             self.nixosModules.blake2b-node
             self.nixosModules.node-wizard
+            self.nixosModules.fast-start
             ./hosts/common.nix
           ]
           ++ extraModules;
@@ -53,6 +56,7 @@
         datum-gateway = ./modules/datum-gateway.nix;
         blake2b-node = ./modules/blake2b-node.nix;
         node-wizard = ./modules/node-wizard.nix;
+        fast-start = ./modules/fast-start.nix;
       };
 
       nixosConfigurations = {

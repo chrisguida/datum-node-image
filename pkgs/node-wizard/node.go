@@ -25,6 +25,9 @@ type nodeStatus struct {
 	Progress float64 `json:"progress"`
 	IBD      bool    `json:"ibd"`
 	Peers    int     `json:"peers"`
+	// assumeutxo: a snapshot chainstate is active while the full history validates behind it
+	Snapshot   bool  `json:"snapshot"`
+	Background int64 `json:"background_blocks"`
 	Error    string  `json:"error,omitempty"`
 }
 
@@ -39,7 +42,15 @@ type gatewayStatus struct {
 	Error          string `json:"error,omitempty"`
 }
 
+type fastStartStatus struct {
+	Phase     string `json:"phase"`
+	Percent   int    `json:"percent"`
+	Detail    string `json:"detail"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
 type statusData struct {
+	FastStart  *fastStartStatus `json:"fast_start,omitempty"`
 	Node       nodeStatus    `json:"node"`
 	Gateway    gatewayStatus `json:"gateway"`
 	DiskFreeGB float64       `json:"disk_free_gb"`
@@ -114,6 +125,22 @@ func (a *App) nodeStatus() nodeStatus {
 		return st
 	}
 	st.Headers, st.Blocks, st.Progress, st.IBD = bci.Headers, bci.Blocks, bci.Progress, bci.IBD
+	if res, err := a.rpc("getchainstates"); err == nil {
+		var cs struct {
+			Chainstates []struct {
+				Blocks            int64  `json:"blocks"`
+				SnapshotBlockhash string `json:"snapshot_blockhash"`
+			} `json:"chainstates"`
+		}
+		if json.Unmarshal(res, &cs) == nil && len(cs.Chainstates) == 2 {
+			st.Snapshot = true
+			for _, c := range cs.Chainstates {
+				if c.SnapshotBlockhash == "" {
+					st.Background = c.Blocks
+				}
+			}
+		}
+	}
 	if res, err := a.rpc("getnetworkinfo"); err == nil {
 		var ni struct {
 			Connections int `json:"connections"`
@@ -240,8 +267,56 @@ func diskFreeGB(path string) float64 {
 	return float64(fs.Bavail) * float64(fs.Bsize) / 1e9
 }
 
+func (a *App) fastStartStatus() *fastStartStatus {
+	if a.cfg.FastStartFile == "" {
+		return nil
+	}
+	b, err := os.ReadFile(a.cfg.FastStartFile)
+	if err != nil {
+		return nil
+	}
+	var f fastStartStatus
+	if json.Unmarshal(b, &f) != nil {
+		return nil
+	}
+	return &f
+}
+
+// fastStartLine is the one sentence the status page shows for the fast start.
+func fastStartLine(lang string, s statusData) string {
+	f := s.FastStart
+	if f == nil {
+		if s.Node.Snapshot {
+			return fmt.Sprintf(tr(lang, "fs_background"), s.Node.Background)
+		}
+		return ""
+	}
+	switch f.Phase {
+	case "headers":
+		return tr(lang, "fs_headers")
+	case "downloading":
+		return fmt.Sprintf(tr(lang, "fs_downloading"), f.Percent)
+	case "verifying":
+		return tr(lang, "fs_verifying")
+	case "loading":
+		return tr(lang, "fs_loading")
+	case "catching_up", "done":
+		if s.Node.Snapshot {
+			return fmt.Sprintf(tr(lang, "fs_background"), s.Node.Background)
+		}
+		if s.Node.IBD {
+			return tr(lang, "fs_catching_up")
+		}
+		return ""
+	case "failed":
+		return fmt.Sprintf(tr(lang, "fs_failed"), f.Detail)
+	}
+	return ""
+}
+
 func (a *App) collectStatus(host string) statusData {
 	return statusData{
+		FastStart:  a.fastStartStatus(),
 		Node:       a.nodeStatus(),
 		Gateway:    a.gatewayStatus(),
 		DiskFreeGB: diskFreeGB("/var/lib"),

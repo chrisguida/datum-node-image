@@ -55,6 +55,7 @@ type config struct {
 	SetupCodeFile   string
 	DashboardListen string
 	SampleInterval  time.Duration
+	FastStartFile   string
 }
 
 type gatewayChoice struct {
@@ -127,6 +128,7 @@ type statusView struct {
 	Synced      bool
 	// the gateway cannot get a template while the node syncs; that is not a fault
 	GatewayWaitingSync bool
+	FastStartLine      string
 }
 
 var (
@@ -154,6 +156,7 @@ func main() {
 	flag.StringVar(&cfg.SetupCodeFile, "setup-code-file", "", "file holding a pre-set setup code (e.g. from cloud-init); default <state-dir>/setup-code")
 	flag.StringVar(&cfg.DashboardListen, "dashboard-listen", ":7443", "HTTPS listen address for the proxied gateway dashboard; empty disables")
 	flag.DurationVar(&cfg.SampleInterval, "sample-interval", 60*time.Second, "how often the gateway hashrate is sampled for the chart")
+	flag.StringVar(&cfg.FastStartFile, "fast-start-progress", "/var/lib/bitcoind-blake2b/fast-start/progress.json", "progress file of the assumeutxo fast start; empty disables")
 	flag.Parse()
 	if consoles != "" {
 		cfg.ConsoleDevices = strings.Split(consoles, ",")
@@ -704,7 +707,7 @@ func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func (a *App) statusView(host string) *statusView {
+func (a *App) statusView(host, lang string) *statusView {
 	s := a.collectStatus(host)
 	v := &statusView{statusData: s}
 	v.ProgressPct = fmt.Sprintf("%.2f", s.Node.Progress*100)
@@ -714,12 +717,13 @@ func (a *App) statusView(host string) *statusView {
 	if s.Node.IBD && strings.Contains(strings.ToLower(s.Gateway.Connection), "template") {
 		v.GatewayWaitingSync = true
 	}
+	v.FastStartLine = fastStartLine(lang, s)
 	return v
 }
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	pd := a.page(w, r)
-	pd.Status = a.statusView(pd.Host)
+	pd.Status = a.statusView(pd.Host, pd.Lang)
 	pd.Pool = a.poolStatsView(pd.Lang)
 	pd.HashrateSVG = a.hashrateSVG()
 	pd.DashboardURL = a.dashboardURL(pd.Host)

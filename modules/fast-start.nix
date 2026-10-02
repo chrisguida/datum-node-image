@@ -1,0 +1,184 @@
+# services.blake2b-node.fastStart
+#
+# First-boot assumeutxo: once bitcoind has the headers, download the published
+# UTXO snapshot, verify its SHA256, hand it to `loadtxoutset`, and let the
+# node validate history in the background while the gateway already serves
+# work. Progress goes to a small JSON file the setup page shows. Any failure
+# leaves the node syncing normally.
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  node = config.services.blake2b-node;
+  cfg = node.fastStart;
+  inst = "blake2b";
+  bitcoind = config.services.bitcoind.${inst};
+  stateDir = "${bitcoind.dataDir}/fast-start";
+  progressFile = "${stateDir}/progress.json";
+  script = pkgs.writeShellScript "bitcoind-fast-start" ''
+    set -u
+    export PATH=${
+      lib.makeBinPath [
+        pkgs.coreutils
+        pkgs.curl
+        pkgs.jq
+        pkgs.gnugrep
+        node.knotsPackage
+      ]
+    }
+    STATE=${stateDir}
+    SNAP=$STATE/snapshot.dat
+    mkdir -p "$STATE"
+    chmod 750 "$STATE"
+    cli() { bitcoin-cli -datadir=${bitcoind.dataDir} -rpcclienttimeout=0 "$@"; }
+    progress() { # phase percent detail
+      printf '{"phase":"%s","percent":%d,"detail":"%s","updated_at":%d}\n' "$1" "$2" "$3" "$(date +%s)" > "$STATE/progress.tmp"
+      chmod 644 "$STATE/progress.tmp"
+      mv "$STATE/progress.tmp" ${progressFile}
+    }
+    if [ -e "$STATE/done" ]; then
+      exit 0
+    fi
+    # wait for RPC
+    until cli getblockchaininfo >/dev/null 2>&1; do sleep 5; done
+    blocks=$(cli getblockchaininfo | jq -r .blocks)
+    if [ "$blocks" -ge ${toString cfg.height} ]; then
+      progress done 100 "already past snapshot height"
+      touch "$STATE/done"
+      exit 0
+    fi
+    # headers must be known past the snapshot's block
+    progress headers 0 ""
+    while :; do
+      headers=$(cli getblockchaininfo | jq -r .headers)
+      [ "$headers" -ge ${toString cfg.height} ] && break
+      sleep 10
+    done
+    # disk: snapshot + a second chainstate during background validation
+    avail=$(df --output=avail -B1 ${bitcoind.dataDir} | tail -1)
+    need=$(( ${toString cfg.sizeBytes} + 20 * 1024 * 1024 * 1024 ))
+    if [ "$avail" -lt "$need" ]; then
+      progress failed 0 "not enough disk space"
+      exit 0
+    fi
+    # download, resumable
+    progress downloading 0 ""
+    curl -fsSL -C - --retry 30 --retry-delay 10 --retry-all-errors -o "$SNAP.part" ${lib.escapeShellArg cfg.url} &
+    pid=$!
+    while kill -0 $pid 2>/dev/null; do
+      have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
+      pct=$(( have * 100 / ${toString cfg.sizeBytes} ))
+      [ "$pct" -gt 100 ] && pct=100
+      progress downloading "$pct" ""
+      sleep 5
+    done
+    if ! wait $pid; then
+      progress failed 0 "download failed"
+      exit 0
+    fi
+    progress verifying 100 ""
+    if ! echo "${cfg.sha256}  $SNAP.part" | sha256sum -c --status; then
+      rm -f "$SNAP.part"
+      progress failed 0 "checksum mismatch"
+      exit 0
+    fi
+    mv "$SNAP.part" "$SNAP"
+    progress loading 0 ""
+    if out=$(cli loadtxoutset "$SNAP" 2>&1); then
+      echo "$out"
+      rm -f "$SNAP"
+      touch "$STATE/done"
+      progress catching_up 0 ""
+    else
+      echo "loadtxoutset failed: $out" >&2
+      rm -f "$SNAP"
+      progress failed 0 "snapshot load failed"
+    fi
+  '';
+in
+{
+  options.services.blake2b-node.fastStart = {
+    enable = lib.mkEnableOption "assumeutxo fast start from a published snapshot";
+
+    height = lib.mkOption {
+      type = lib.types.ints.positive;
+      description = "Snapshot base height (must be in Knots' chainparams).";
+    };
+    blockhash = lib.mkOption {
+      type = lib.types.str;
+      description = "Block hash at that height.";
+    };
+    utxoHash = lib.mkOption {
+      type = lib.types.str;
+      description = "AssumeUTXO hash_serialized of the snapshot.";
+    };
+    chainTxCount = lib.mkOption {
+      type = lib.types.ints.positive;
+      description = "Transactions in the chain up to the snapshot (m_chain_tx_count).";
+    };
+    url = lib.mkOption {
+      type = lib.types.str;
+      description = "Where the snapshot file is served.";
+    };
+    sha256 = lib.mkOption {
+      type = lib.types.str;
+      description = "SHA256 of the snapshot file (hex).";
+    };
+    sizeBytes = lib.mkOption {
+      type = lib.types.ints.positive;
+      description = "Size of the snapshot file in bytes (for the progress bar and the disk check).";
+    };
+    patchKnots = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Build Knots from source with the snapshot in chainparams. Turn off once the entry is upstream and the release tarball knows it.";
+    };
+  };
+
+  config = lib.mkIf (node.enable && cfg.enable) {
+    assertions = [
+      {
+        assertion = node.prune >= 1100;
+        message = "assumeutxo needs services.blake2b-node.prune >= 1100 while two chainstates exist";
+      }
+    ];
+
+    services.blake2b-node.knotsPackage = lib.mkIf cfg.patchKnots (
+      lib.mkDefault (
+        pkgs.bitcoind-knots-patched {
+          inherit (cfg)
+            height
+            blockhash
+            utxoHash
+            chainTxCount
+            ;
+        }
+      )
+    );
+
+    systemd.services.bitcoind-fast-start = {
+      description = "assumeutxo fast start";
+      wantedBy = [ "multi-user.target" ];
+      after = [
+        "bitcoind-${inst}.service"
+        "network-online.target"
+      ];
+      requires = [ "bitcoind-${inst}.service" ];
+      wants = [ "network-online.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = bitcoind.user;
+        Group = bitcoind.group;
+        ExecStart = script;
+        TimeoutStartSec = "infinity";
+        Restart = "on-failure";
+        RestartSec = "60s";
+        PrivateTmp = true;
+        NoNewPrivileges = true;
+      };
+    };
+  };
+}

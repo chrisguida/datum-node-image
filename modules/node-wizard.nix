@@ -143,6 +143,7 @@ in
           "-http-listen :${toString cfg.httpPort}"
           "-dashboard-listen :${toString cfg.dashboardPort}"
           "-console-devices ${lib.concatStringsSep "," cfg.consoleDevices}"
+          "-fast-start-progress ${bitcoind.dataDir}/fast-start/progress.json"
         ];
         Restart = "on-failure";
         RestartSec = "3s";

@@ -13,6 +13,7 @@
 <div class="row"><span class="k">{{.T "sync"}}</span><span class="v">{{$s.ProgressPct}}%</span></div>
 <div class="bar"><div style="width:{{$s.ProgressPct}}%"></div></div>
 <p class="note">{{if $s.Synced}}<span class="good">{{.T "synced"}}</span>{{else}}{{.T "syncing"}}{{end}}</p>
+{{if $s.FastStartLine}}<div class="row"><span class="k">{{.T "fast_start"}}</span><span class="v">{{$s.FastStartLine}}</span></div>{{end}}
 <div class="row"><span class="k">{{.T "headers"}}</span><span class="v">{{$s.Node.Headers}}</span></div>
 <div class="row"><span class="k">{{.T "blocks"}}</span><span class="v">{{$s.Node.Blocks}}</span></div>
 <div class="row"><span class="k">{{.T "peers"}}</span><span class="v">{{$s.Node.Peers}}</span></div>
