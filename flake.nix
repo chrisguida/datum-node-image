@@ -48,6 +48,19 @@
         };
 
       images = self.nixosConfigurations.blake2b-vps-image.config.system.build.images;
+
+      # nixpkgs gzips the DigitalOcean image with the file's mtime in the gzip
+      # header, which makes the published file differ between otherwise identical
+      # builds. Re-compress without name and timestamp so it reproduces.
+      deterministicGzip =
+        pkgs: drv:
+        pkgs.runCommand "${drv.name}-deterministic" { nativeBuildInputs = [ pkgs.gzip ]; } ''
+          mkdir -p $out
+          for f in ${drv}/*.qcow2.gz; do
+            gunzip -c "$f" | gzip -9 -n > "$out/$(basename "$f")"
+          done
+          cp -r ${drv}/nix-support $out/ 2>/dev/null || true
+        '';
     in
     {
       overlays.default = overlay;
@@ -90,7 +103,7 @@
           image-qcow2 = images.qemu-efi;
           image-raw-efi = images.raw-efi;
           image-raw-bios = images.raw;
-          image-digitalocean = images.digital-ocean;
+          image-digitalocean = deterministicGzip pkgs images.digital-ocean;
         }
       );
 
