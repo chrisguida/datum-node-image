@@ -91,6 +91,11 @@ let
     fi
     mv "$SNAP.part" "$SNAP"
     progress loading 0 ""
+    # Pause peer traffic while the snapshot loads: otherwise the normal chainstate keeps
+    # downloading and validating old blocks in parallel, competing for the two cores
+    # and the RAM of a small VPS. Headers are already in; nothing is lost.
+    cli setnetworkactive false >/dev/null 2>&1 || true
+    trap 'cli setnetworkactive true >/dev/null 2>&1 || true' EXIT
     # bitcoind logs "[snapshot] N coins loaded (xx.xx%, ...)" to debug.log every million coins
     cli loadtxoutset "$SNAP" > "$STATE/load.out" 2>&1 &
     pid=$!
@@ -99,6 +104,7 @@ let
       progress loading "''${pct:-0}" ""
       sleep 5
     done
+    cli setnetworkactive true >/dev/null 2>&1 || true
     if wait $pid; then
       cat "$STATE/load.out"
       rm -f "$SNAP" "$STATE/load.out"

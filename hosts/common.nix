@@ -16,6 +16,12 @@ in
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
 
+  # compressed-RAM swap: headroom for the snapshot load on 2 to 4 GB boxes
+  zramSwap = {
+    enable = true;
+    memoryPercent = 50;
+  };
+
   time.timeZone = "UTC";
   i18n.defaultLocale = "en_US.UTF-8";
 
