@@ -64,20 +64,24 @@ let
       progress failed 0 "not enough disk space"
       exit 0
     fi
-    # download, resumable
-    progress downloading 0 ""
-    curl -fsSL -C - --retry 30 --retry-delay 10 --retry-all-errors -o "$SNAP.part" ${lib.escapeShellArg cfg.url} &
-    pid=$!
-    while kill -0 $pid 2>/dev/null; do
-      have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
-      pct=$(( have * 100 / ${toString cfg.sizeBytes} ))
-      [ "$pct" -gt 100 ] && pct=100
-      progress downloading "$pct" ""
-      sleep 5
-    done
-    if ! wait $pid; then
-      progress failed 0 "download failed"
-      exit 0
+    # download, resumable; skipped when a complete file is already there
+    # (a previous run that stopped between download and verification)
+    have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
+    if [ "$have" -lt ${toString cfg.sizeBytes} ]; then
+      progress downloading 0 ""
+      curl -fsSL -C - --retry 30 --retry-delay 10 --retry-all-errors -o "$SNAP.part" ${lib.escapeShellArg cfg.url} &
+      pid=$!
+      while kill -0 $pid 2>/dev/null; do
+        have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
+        pct=$(( have * 100 / ${toString cfg.sizeBytes} ))
+        [ "$pct" -gt 100 ] && pct=100
+        progress downloading "$pct" ""
+        sleep 5
+      done
+      if ! wait $pid; then
+        progress failed 0 "download failed"
+        exit 0
+      fi
     fi
     progress verifying 100 ""
     if ! echo "${cfg.sha256}  $SNAP.part" | sha256sum -c --status; then

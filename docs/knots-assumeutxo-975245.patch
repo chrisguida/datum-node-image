@@ -1,0 +1,15 @@
+--- a/src/kernel/chainparams.cpp
++++ b/src/kernel/chainparams.cpp
+@@ -261,6 +261,12 @@
+                 .hash_serialized = AssumeutxoHash{uint256{"4daf8a17b4902498c5787966a2b51c613acdab5df5db73f196fa59a4da2f1568"}},
+                 .m_chain_tx_count = 1226586151,
+                 .blockhash = consteval_ctor(uint256{"0000000000000000000108970acb9522ffd516eae17acddcb1bd16469194a821"}),
++            },
++            {
++                .height = 975'245,
++                .hash_serialized = AssumeutxoHash{uint256{"4cd38b1ce3f8d3753f716b99a16c85138a8d60102d9b3d532264c19c16c54a97"}},
++                .m_chain_tx_count = 1417062280,
++                .blockhash = consteval_ctor(uint256{"0000000000000000ed0d972dbe57e3d8c5e80a5dd1963847196152bdb2f8f977"}),
+             }
+         };
+ 

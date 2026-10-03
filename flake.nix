@@ -90,6 +90,7 @@
           image-qcow2 = images.qemu-efi;
           image-raw-efi = images.raw-efi;
           image-raw-bios = images.raw;
+          image-digitalocean = images.digital-ocean;
         }
       );
 

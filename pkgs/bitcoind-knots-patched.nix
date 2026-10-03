@@ -27,6 +27,12 @@ in
 bitcoind-knots.overrideAttrs (old: {
   pname = "bitcoind-knots-assumeutxo-${toString height}";
   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ python3 ];
+  # nixpkgs re-verifies the tarball against SHA256SUMS.asc fetched by hash at
+  # build time; that file changes on the server when signatures are added and
+  # then fails as a fixed-output mismatch. The tarball itself is already pinned
+  # by its hash in nixpkgs (sha256 11c0b99a82b8b1c9c29ab76d9b0507ce1017813665741627b3f3883a4c2f7a7f,
+  # the value in the signed SHA256SUMS of 29.4.2.knots20260508), so skip that step.
+  preUnpack = "";
   postPatch = (old.postPatch or "") + ''
     python3 - <<'PY'
     import re, sys
