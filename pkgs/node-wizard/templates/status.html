@@ -9,11 +9,11 @@
 <h2>{{.T "node"}}
 {{if eq $s.Node.Active "active"}}<span class="good">· {{.T "running"}}</span>{{else}}<span class="bad">· {{.T "stopped"}} ({{$s.Node.Active}})</span>{{end}}
 </h2>
-{{if $s.Node.Error}}<div class="err">{{$s.Node.Error}}</div>{{end}}
+{{if $s.Node.Busy}}<div class="ok" style="background:#fff4e0;color:#8a5a00">{{.T "node_busy"}}</div>{{else if $s.Node.Error}}<div class="err">{{$s.Node.Error}}</div>{{end}}
 <div class="row"><span class="k">{{.T "sync"}}</span><span class="v">{{$s.ProgressPct}}%</span></div>
 <div class="bar"><div style="width:{{$s.ProgressPct}}%"></div></div>
 <p class="note">{{if $s.Synced}}<span class="good">{{.T "synced"}}</span>{{else}}{{.T "syncing"}}{{end}}</p>
-{{if $s.FastStartLine}}<div class="row"><span class="k">{{.T "fast_start"}}</span><span class="v">{{$s.FastStartLine}}</span></div>{{end}}
+{{if $s.FastStartLine}}<div class="row"><span class="k">{{.T "fast_start"}}</span><span class="v">{{$s.FastStartLine}}</span></div>{{if ge $s.FastStartPct 0}}<div class="bar"><div style="width:{{$s.FastStartPct}}%"></div></div>{{end}}{{end}}
 <div class="row"><span class="k">{{.T "headers"}}</span><span class="v">{{$s.Node.Headers}}</span></div>
 <div class="row"><span class="k">{{.T "blocks"}}</span><span class="v">{{$s.Node.Blocks}}</span></div>
 <div class="row"><span class="k">{{.T "peers"}}</span><span class="v">{{$s.Node.Peers}}</span></div>

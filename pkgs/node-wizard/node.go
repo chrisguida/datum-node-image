@@ -28,6 +28,7 @@ type nodeStatus struct {
 	// assumeutxo: a snapshot chainstate is active while the full history validates behind it
 	Snapshot   bool  `json:"snapshot"`
 	Background int64 `json:"background_blocks"`
+	Busy     bool    `json:"busy"`
 	Error    string  `json:"error,omitempty"`
 }
 
@@ -111,6 +112,10 @@ func (a *App) nodeStatus() nodeStatus {
 	st := nodeStatus{Active: systemdActive(a.cfg.BitcoindUnit)}
 	res, err := a.rpc("getblockchaininfo")
 	if err != nil {
+		// a snapshot load holds bitcoind's main lock during its flushes; RPC calls then time out
+		if strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "timeout") {
+			st.Busy = true
+		}
 		st.Error = err.Error()
 		return st
 	}
@@ -299,7 +304,7 @@ func fastStartLine(lang string, s statusData) string {
 	case "verifying":
 		return tr(lang, "fs_verifying")
 	case "loading":
-		return tr(lang, "fs_loading")
+		return fmt.Sprintf(tr(lang, "fs_loading"), f.Percent)
 	case "catching_up", "done":
 		if s.Node.Snapshot {
 			return fmt.Sprintf(tr(lang, "fs_background"), s.Node.Background)

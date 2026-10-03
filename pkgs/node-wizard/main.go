@@ -129,6 +129,7 @@ type statusView struct {
 	// the gateway cannot get a template while the node syncs; that is not a fault
 	GatewayWaitingSync bool
 	FastStartLine      string
+	FastStartPct       int // -1 when no bar applies
 }
 
 var (
@@ -718,6 +719,10 @@ func (a *App) statusView(host, lang string) *statusView {
 		v.GatewayWaitingSync = true
 	}
 	v.FastStartLine = fastStartLine(lang, s)
+	v.FastStartPct = -1
+	if s.FastStart != nil && (s.FastStart.Phase == "downloading" || s.FastStart.Phase == "loading") {
+		v.FastStartPct = s.FastStart.Percent
+	}
 	return v
 }
 

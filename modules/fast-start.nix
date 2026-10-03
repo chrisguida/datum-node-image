@@ -91,14 +91,22 @@ let
     fi
     mv "$SNAP.part" "$SNAP"
     progress loading 0 ""
-    if out=$(cli loadtxoutset "$SNAP" 2>&1); then
-      echo "$out"
-      rm -f "$SNAP"
+    # bitcoind logs "[snapshot] N coins loaded (xx.xx%, ...)" to debug.log every million coins
+    cli loadtxoutset "$SNAP" > "$STATE/load.out" 2>&1 &
+    pid=$!
+    while kill -0 $pid 2>/dev/null; do
+      pct=$(grep -a "coins loaded (" ${bitcoind.dataDir}/debug.log 2>/dev/null | tail -1 | grep -oE '\([0-9]+' | tr -d '(')
+      progress loading "''${pct:-0}" ""
+      sleep 5
+    done
+    if wait $pid; then
+      cat "$STATE/load.out"
+      rm -f "$SNAP" "$STATE/load.out"
       touch "$STATE/done"
       progress catching_up 0 ""
     else
-      echo "loadtxoutset failed: $out" >&2
-      rm -f "$SNAP"
+      echo "loadtxoutset failed: $(cat "$STATE/load.out")" >&2
+      rm -f "$SNAP" "$STATE/load.out"
       progress failed 0 "snapshot load failed"
     fi
   '';

@@ -39,7 +39,7 @@
   "fs_headers": "waiting for block headers",
   "fs_downloading": "downloading the snapshot, %d%%",
   "fs_verifying": "verifying the snapshot",
-  "fs_loading": "loading the snapshot (20 to 45 minutes)",
+  "fs_loading": "loading the snapshot, %d%%",
   "fs_catching_up": "catching up to the newest block",
   "fs_background": "mining is on; old blocks are being verified in the background (at block %d)",
   "fs_failed": "fast start failed (%s); syncing normally instead",
@@ -91,5 +91,6 @@
   "refresh_note": "This page refreshes every 15 seconds.",
   "updated": "Updated",
   "not_available": "not available",
+  "node_busy": "The node is busy (it is loading the snapshot); this page catches up on the next refresh.",
   "unknown": "unknown"
 }
