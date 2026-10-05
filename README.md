@@ -182,6 +182,32 @@ Bit-for-bit reproducibility of the disk image itself is designed in by the
 nixpkgs image builder but is not proven until two independent runners produce
 the same hash; that is phase 4.
 
+## Known issues and caveats (2026-10-05)
+
+- **Snapshot hosting is temporary and slow.** The fast start downloads the
+  UTXO snapshot from a Tailscale Funnel on a home machine at about 1.4 MB/s,
+  so that phase takes about two hours instead of ten minutes. Proper hosting
+  (a torrent with an HTTP web seed, or object storage) is next. In the one
+  real VPS test so far the file was pushed to the server directly and the
+  rest of the fast start took 44 minutes from power-on to a mining-ready node.
+- **Knots is built from source for now.** `loadtxoutset` only accepts
+  snapshots whose hash is compiled into Knots, so the image carries a one-line
+  chainparams patch (`docs/knots-assumeutxo-975245.patch`) until that entry is
+  merged upstream; then the official, attested release binary is used again.
+- **The image is not yet bit-for-bit reproducible.** Two builds differ because
+  nixpkgs' image builder leaves the ext4 directory hash seed random and writes
+  build-time timestamps into the boot partition. Fixes are identified, not
+  applied; see the roadmap.
+- **4 GB of RAM is the floor** with the current fixed settings; 2 GB plans
+  need the first-boot auto-sizing that is still to be written.
+- **Self-signed certificate.** The setup page cannot get a trusted certificate
+  without a domain, so browsers warn once.
+- **Pools:** OmegaPool, Paperclip, Lazarus and CONVOY are pinned; Maveth's
+  RIPTIDE is missing because it does not publish its DATUM key. Pools can add
+  themselves by pull request to `data/pools.nix` (host, port, pinned key).
+- **Tested providers:** DigitalOcean (image import) and local QEMU. Vultr,
+  LunaNode and the Hetzner rescue-mode path are untested.
+
 ## Layout
 
 ```
