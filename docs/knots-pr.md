@@ -34,8 +34,12 @@ nchaintx        1417215373
 File: `utxo-976000.dat`, 9,517,597,408 bytes,
 SHA256 `bfd2460a55ae1d2e94b9957ccd512ae027855feed1dbef996cfed0abebe5d123`,
 served at https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-976000.dat
-with `SHA256SUMS` and `utxo-976000.dat.torrent` next to it (torrent: infohash
-`3cf7e4d15841f116856f6f19bf2ac15b1dbae2c3`, the HTTPS URL above is its web seed).
+with `SHA256SUMS` and `utxo-976000.dat.torrent` next to it. Torrent (the HTTPS URL above is
+its web seed, so it works even with no other peers):
+
+```
+magnet:?xt=urn:btih:3cf7e4d15841f116856f6f19bf2ac15b1dbae2c3&dn=utxo-976000.dat&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&ws=https%3A%2F%2Fmb-beast.tail4a715.ts.net%3A8443%2Fdatum-node-image%2Futxo-976000.dat
+```
 
 ## How to verify (reviewers)
 
