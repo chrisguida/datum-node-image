@@ -24,6 +24,7 @@ let
       lib.makeBinPath [
         pkgs.coreutils
         pkgs.curl
+        pkgs.aria2
         pkgs.jq
         pkgs.gnugrep
         node.knotsPackage
@@ -69,18 +70,47 @@ let
     have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
     if [ "$have" -lt ${toString cfg.sizeBytes} ]; then
       progress downloading 0 ""
-      curl -fsSL -C - --retry 30 --retry-delay 10 --retry-all-errors -o "$SNAP.part" ${lib.escapeShellArg cfg.url} &
-      pid=$!
-      while kill -0 $pid 2>/dev/null; do
-        have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
-        pct=$(( have * 100 / ${toString cfg.sizeBytes} ))
-        [ "$pct" -gt 100 ] && pct=100
-        progress downloading "$pct" ""
-        sleep 5
-      done
-      if ! wait $pid; then
-        progress failed 0 "download failed"
-        exit 0
+      downloaded=0
+      ${lib.optionalString (cfg.torrentUrl != null) ''
+        # BitTorrent first: peers plus the HTTPS web seed in the torrent. aria2 names
+        # the file after the torrent; stop seeding as soon as the download is complete.
+        if curl -fsSL --retry 5 -o "$STATE/snapshot.torrent" ${lib.escapeShellArg cfg.torrentUrl}; then
+          tname=$(aria2c --show-files "$STATE/snapshot.torrent" 2>/dev/null | grep -oE '^ *1\|.*' | sed 's/^ *1|//' | head -1)
+          tname=''${tname:-${baseNameOf cfg.url}}
+          aria2c --dir="$STATE" --seed-time=0 --bt-stop-timeout=600 --check-integrity=true \
+            --continue=true --max-connection-per-server=4 --summary-interval=5 \
+            --listen-port=${toString cfg.torrentPort} --dht-listen-port=${toString cfg.torrentPort} \
+            --console-log-level=warn "$STATE/snapshot.torrent" > "$STATE/aria2.log" 2>&1 &
+          pid=$!
+          while kill -0 $pid 2>/dev/null; do
+            pct=$(grep -aoE '\([0-9]+%\)' "$STATE/aria2.log" | tail -1 | tr -dc '0-9')
+            progress downloading "''${pct:-0}" "torrent"
+            sleep 5
+          done
+          if wait $pid && [ "$(stat -c %s "$STATE/$tname" 2>/dev/null || echo 0)" -ge ${toString cfg.sizeBytes} ]; then
+            mv "$STATE/$tname" "$SNAP.part"
+            rm -f "$STATE/$tname.aria2" "$STATE/snapshot.torrent"
+            downloaded=1
+          else
+            echo "torrent download failed, falling back to HTTPS" >&2
+            rm -f "$STATE/$tname" "$STATE/$tname.aria2"
+          fi
+        fi
+      ''}
+      if [ "$downloaded" = 0 ]; then
+        curl -fsSL -C - --retry 30 --retry-delay 10 --retry-all-errors -o "$SNAP.part" ${lib.escapeShellArg cfg.url} &
+        pid=$!
+        while kill -0 $pid 2>/dev/null; do
+          have=$(stat -c %s "$SNAP.part" 2>/dev/null || echo 0)
+          pct=$(( have * 100 / ${toString cfg.sizeBytes} ))
+          [ "$pct" -gt 100 ] && pct=100
+          progress downloading "$pct" ""
+          sleep 5
+        done
+        if ! wait $pid; then
+          progress failed 0 "download failed"
+          exit 0
+        fi
       fi
     fi
     progress verifying 100 ""
@@ -141,6 +171,16 @@ in
       type = lib.types.str;
       description = "Where the snapshot file is served.";
     };
+    torrentUrl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "URL of a .torrent for the snapshot (web seed + peers). Tried before the plain download; null disables BitTorrent.";
+    };
+    torrentPort = lib.mkOption {
+      type = lib.types.port;
+      default = 6881;
+      description = "TCP/UDP port aria2 listens on while downloading the snapshot (opened in the firewall when torrentUrl is set).";
+    };
     sha256 = lib.mkOption {
       type = lib.types.str;
       description = "SHA256 of the snapshot file (hex).";
@@ -176,6 +216,11 @@ in
         }
       )
     );
+
+    networking.firewall = lib.mkIf (cfg.torrentUrl != null) {
+      allowedTCPPorts = [ cfg.torrentPort ];
+      allowedUDPPorts = [ cfg.torrentPort ];
+    };
 
     systemd.services.bitcoind-fast-start = {
       description = "assumeutxo fast start";

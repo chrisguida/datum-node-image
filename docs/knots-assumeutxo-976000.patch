@@ -6,10 +6,10 @@
                  .blockhash = consteval_ctor(uint256{"0000000000000000000108970acb9522ffd516eae17acddcb1bd16469194a821"}),
 +            },
 +            {
-+                .height = 975'245,
-+                .hash_serialized = AssumeutxoHash{uint256{"4cd38b1ce3f8d3753f716b99a16c85138a8d60102d9b3d532264c19c16c54a97"}},
-+                .m_chain_tx_count = 1417062280,
-+                .blockhash = consteval_ctor(uint256{"0000000000000000ed0d972dbe57e3d8c5e80a5dd1963847196152bdb2f8f977"}),
++                .height = 976'000,
++                .hash_serialized = AssumeutxoHash{uint256{"dbd67717d3f108e4fbd8b4f9efc4057cac11a0ba7c23584b43cca42c9edb7118"}},
++                .m_chain_tx_count = 1417215373,
++                .blockhash = consteval_ctor(uint256{"000000000000000098441aee029573795681eb1602c75271e809b136e9217373"}),
              }
          };
  
