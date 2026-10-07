@@ -46,11 +46,22 @@ its tip (any unpruned node; a pruned one only if it has not pruned past 976000).
    bitcoin-cli -rpcclienttimeout=0 -named dumptxoutset path=check-976000.dat rollback=976000
    ```
 
-   On 29.4.2 this pauses network activity and rolls the node back temporarily;
-   it took 123 s for 59 blocks on an NVMe disk and gets slower the further the
-   tip moves away, so do it soon. With the companion backport of bitcoin/bitcoin#33477
-   the rollback runs on a copy of the chainstate, the node stays online, and
-   `in_memory=true` makes it faster on a machine with more than 12 GB of RAM.
+   Two ways to run it:
+
+   a) Stock 29.4.2: network activity pauses and the node rolls back temporarily
+      (123 s for 59 blocks on an NVMe disk; slower the further the tip has moved
+      away from 976000, so do it soon).
+
+   b) Node stays online: build the companion backport of bitcoin/bitcoin#33477
+      (#NNN) first. A branch with this entry on top of it is at
+
+      ```
+      git fetch https://github.com/chrisguida/bitcoin assumeutxo-976000-online && git checkout FETCH_HEAD
+      ```
+
+      then run the same command; add `in_memory=true` on a machine with more
+      than 12 GB of RAM. An assumeutxo node cannot roll back to its own base
+      height until background validation has passed it, so use a full node.
 
 2. Compare the result with this entry. Expected:
 
