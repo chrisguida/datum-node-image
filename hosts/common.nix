@@ -63,13 +63,14 @@ in
   # (dumptxoutset type=latest); the Knots build carries the chainparams entry until it is upstream
   services.blake2b-node.fastStart = {
     enable = true;
-    height = 975245;
-    blockhash = "0000000000000000ed0d972dbe57e3d8c5e80a5dd1963847196152bdb2f8f977";
-    utxoHash = "4cd38b1ce3f8d3753f716b99a16c85138a8d60102d9b3d532264c19c16c54a97";
-    chainTxCount = 1417062280;
-    url = "https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-975245.dat";
-    sha256 = "64c775cf1072d9ce6b6908b9d2c122a365cf1954bcde90a35fdcf8911e15b94c";
-    sizeBytes = 9516250735;
+    height = 976000;
+    blockhash = "000000000000000098441aee029573795681eb1602c75271e809b136e9217373";
+    utxoHash = "dbd67717d3f108e4fbd8b4f9efc4057cac11a0ba7c23584b43cca42c9edb7118";
+    chainTxCount = 1417215373;
+    url = "https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-976000.dat";
+    torrentUrl = "https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-976000.dat.torrent";
+    sha256 = "bfd2460a55ae1d2e94b9957ccd512ae027855feed1dbef996cfed0abebe5d123";
+    sizeBytes = 9517597408;
   };
   # first-boot setup page on https://<ip>/ (self-signed certificate), http redirects
   services.node-wizard.enable = true;

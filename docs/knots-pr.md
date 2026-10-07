@@ -30,9 +30,10 @@ nchaintx        1417215373
 ```
 
 File: `utxo-976000.dat`, 9,517,597,408 bytes,
-SHA256 `<<SHA256 — filled in once the file is published>>`,
+SHA256 `bfd2460a55ae1d2e94b9957ccd512ae027855feed1dbef996cfed0abebe5d123`,
 served at https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-976000.dat
-and as a torrent: `<<magnet — filled in once seeded>>`.
+with `SHA256SUMS` and `utxo-976000.dat.torrent` next to it (torrent: infohash
+`3cf7e4d15841f116856f6f19bf2ac15b1dbae2c3`, the HTTPS URL above is its web seed).
 
 ## How to verify (reviewers)
 
