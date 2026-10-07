@@ -47,5 +47,8 @@ operation on any synced node.
 
 - Built on Ubuntu 26.04 (g++ 15.2, cmake 4.2.3, boost 1.90) on 2026-10-07.
 - `test/functional/rpc_dumptxoutset.py` and `tool_utxo_to_sqlite.py` pass (python 3.14).
-- Mainnet: `dumptxoutset path=x rollback=976000` on a synced node while it kept serving
-  peers; hash matched the invalidateblock-based run (dbd67717…7118) — `<<fill in time>>`
+- Mainnet (2026-10-07, mb-beast node2: pruned assumeutxo node, snapshot at 976000, tip 976069):
+  `dumptxoutset rollback=976001` with the node online (10 peers): disk 784 s (9.1 GB temp DB,
+  cleaned up), in_memory=true 473 s, both txoutset_hash ed7dfbf6…fb98 / nchaintx 1417215824.
+  rollback=976000 is refused on that node (base block has no undo data until background
+  validation reaches it) — same check as before the backport.
