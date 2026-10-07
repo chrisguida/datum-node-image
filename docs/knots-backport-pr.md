@@ -1,5 +1,7 @@
 # Knots PR: dumptxoutset rollback without invalidating blocks (backport of bitcoin/bitcoin#33477)
 
+Opened 2026-10-07: https://github.com/bitcoinknots/bitcoin/pull/443 (used by https://github.com/bitcoinknots/bitcoin/pull/444)
+
 Local branch: `~/projects/claude/knots-pr/bitcoin` → `dumptxoutset-rollback-copy` (3 commits on `29.x-knots`).
 Target: bitcoinknots/bitcoin `29.x-knots`. Companion to the assumeutxo PR (`knots-pr.md`).
 
@@ -38,7 +40,7 @@ Commits:
 - test: Add dumptxoutset fork test (ab9463efac)
 - test: Extend named pipe sqlite tool test to use rollback (d0fd718948)
 
-Motivation: makes verifying the assumeutxo snapshot in <assumeutxo PR> a background
+Motivation: makes verifying the assumeutxo snapshot in bitcoinknots/bitcoin#444 a background
 operation on any synced node.
 
 ## Testing done

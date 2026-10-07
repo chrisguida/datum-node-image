@@ -192,7 +192,7 @@ the same hash; that is phase 4.
   rest of the fast start took 44 minutes from power-on to a mining-ready node.
 - **Knots is built from source for now.** `loadtxoutset` only accepts
   snapshots whose hash is compiled into Knots, so the image carries a one-line
-  chainparams patch (`docs/knots-assumeutxo-976000.patch`) until that entry is
+  chainparams patch (`docs/knots-assumeutxo-976000.patch`, [bitcoinknots/bitcoin#444](https://github.com/bitcoinknots/bitcoin/pull/444)) until that entry is
   merged upstream; then the official, attested release binary is used again.
 - **The image is not yet bit-for-bit reproducible.** Two builds differ because
   nixpkgs' image builder leaves the ext4 directory hash seed random and writes

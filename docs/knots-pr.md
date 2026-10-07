@@ -1,5 +1,7 @@
 # Knots PR: assumeutxo snapshot at height 976000
 
+Opened 2026-10-07: https://github.com/bitcoinknots/bitcoin/pull/444 (companion backport: https://github.com/bitcoinknots/bitcoin/pull/443)
+
 Patch: `knots-assumeutxo-976000.patch` (one entry appended to the mainnet
 `m_assumeutxo_data` table in `src/kernel/chainparams.cpp`, branch `29.x-knots`).
 Local branch: `~/projects/claude/knots-pr/bitcoin` → `assumeutxo-976000`
@@ -53,7 +55,7 @@ its tip (any unpruned node; a pruned one only if it has not pruned past 976000).
       away from 976000, so do it soon).
 
    b) Node stays online: build the companion backport of bitcoin/bitcoin#33477
-      (#NNN) first. A branch with this entry on top of it is at
+      (bitcoinknots/bitcoin#443) first. A branch with this entry on top of it is at
 
       ```
       git fetch https://github.com/chrisguida/bitcoin assumeutxo-976000-online && git checkout FETCH_HEAD
