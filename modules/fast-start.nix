@@ -54,13 +54,6 @@ let
       touch "$STATE/done"
       exit 0
     fi
-    # headers must be known past the snapshot's block
-    progress headers 0 ""
-    while :; do
-      headers=$(cli getblockchaininfo | jq -r .headers)
-      [ "$headers" -ge ${toString cfg.height} ] && break
-      sleep 10
-    done
     # disk: snapshot + a second chainstate during background validation
     avail=$(df --output=avail -B1 ${bitcoind.dataDir} | tail -1)
     need=$(( ${toString cfg.sizeBytes} + 20 * 1024 * 1024 * 1024 ))
@@ -123,6 +116,14 @@ let
       exit 0
     fi
     mv "$SNAP.part" "$SNAP"
+    # The file is on disk and checked. Only now wait for the block headers: the node needs the header of the
+    # snapshot's block before loadtxoutset, and the download overlapped with that sync instead of waiting for it.
+    progress headers 0 ""
+    while :; do
+      headers=$(cli getblockchaininfo | jq -r .headers)
+      [ "$headers" -ge ${toString cfg.height} ] && break
+      sleep 10
+    done
     progress loading 0 ""
     # Pause peer traffic while the snapshot loads: otherwise the normal chainstate keeps
     # downloading and validating old blocks in parallel, competing for the two cores
