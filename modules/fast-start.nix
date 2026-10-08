@@ -17,6 +17,9 @@ let
   inst = "blake2b";
   bitcoind = config.services.bitcoind.${inst};
   stateDir = "${bitcoind.dataDir}/fast-start";
+  # aria2 gives up the whole torrent when it cannot bind its listen port, so it gets a range and takes the first
+  # free one (the same range is open in the firewall).
+  portRange = "${toString cfg.torrentPort}-${toString (cfg.torrentPort + 8)}";
   progressFile = "${stateDir}/progress.json";
   script = pkgs.writeShellScript "bitcoind-fast-start" ''
     set -u
@@ -79,7 +82,7 @@ let
           tname=''${tname:-${baseNameOf cfg.url}}
           aria2c --dir="$STATE" --seed-time=0 --bt-stop-timeout=600 --check-integrity=true \
             --continue=true --max-connection-per-server=4 --summary-interval=5 \
-            --listen-port=${toString cfg.torrentPort} --dht-listen-port=${toString cfg.torrentPort} \
+            --listen-port=${portRange} --dht-listen-port=${portRange} \
             --console-log-level=warn "$STATE/snapshot.torrent" > "$STATE/aria2.log" 2>&1 &
           pid=$!
           while kill -0 $pid 2>/dev/null; do
@@ -179,7 +182,7 @@ in
     torrentPort = lib.mkOption {
       type = lib.types.port;
       default = 6881;
-      description = "TCP/UDP port aria2 listens on while downloading the snapshot (opened in the firewall when torrentUrl is set).";
+      description = "First of nine TCP/UDP ports aria2 may listen on while downloading the snapshot (opened in the firewall when torrentUrl is set); it takes the first free one.";
     };
     sha256 = lib.mkOption {
       type = lib.types.str;
@@ -218,8 +221,8 @@ in
     );
 
     networking.firewall = lib.mkIf (cfg.torrentUrl != null) {
-      allowedTCPPorts = [ cfg.torrentPort ];
-      allowedUDPPorts = [ cfg.torrentPort ];
+      allowedTCPPortRanges = [ { from = cfg.torrentPort; to = cfg.torrentPort + 8; } ];
+      allowedUDPPortRanges = [ { from = cfg.torrentPort; to = cfg.torrentPort + 8; } ];
     };
 
     systemd.services.bitcoind-fast-start = {
