@@ -16,11 +16,14 @@ in
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
 
-  # compressed-RAM swap: headroom for the snapshot load on 2 to 4 GB boxes
+  # compressed-RAM swap: a safety margin for the snapshot load on 2 to 4 GB boxes, not working memory.
+  # Half of RAM as zram plus dbcache=1024 made a 4 GB node keep its UTXO cache in swap during the
+  # background validation; a quarter, with a low swappiness, keeps the page cache for block files.
   zramSwap = {
     enable = true;
-    memoryPercent = 50;
+    memoryPercent = 25;
   };
+  boot.kernel.sysctl."vm.swappiness" = 10;
 
   time.timeZone = "UTC";
   i18n.defaultLocale = "en_US.UTF-8";

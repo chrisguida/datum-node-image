@@ -60,8 +60,22 @@ in
 
     dbCache = lib.mkOption {
       type = lib.types.ints.positive;
-      default = 1024;
-      description = "bitcoind -dbcache in MiB. 1024 fits a 4 GB VPS; 2048-4096 speeds up the initial sync on 8 GB.";
+      default = 600;
+      description = ''
+        bitcoind -dbcache in MiB. 600 leaves a 4 GB VPS enough page cache to follow the tip while the
+        assumeutxo background validation runs (1024 on 4 GB swapped the UTXO cache out and the node fell
+        minutes behind new blocks); 2048-4096 speeds up a full initial sync on 8 GB or more.
+      '';
+    };
+
+    maxUploadTarget = lib.mkOption {
+      type = lib.types.ints.unsigned;
+      default = 10000;
+      description = ''
+        bitcoind -maxuploadtarget in MiB per 24 h (0 = unlimited). Past the target the node stops serving
+        blocks older than a week to other peers; new blocks and transactions still relay, so mining is
+        unaffected. Keeps a VPS inside its bandwidth allowance.
+      '';
     };
 
     gateway = lib.mkOption {
@@ -134,6 +148,7 @@ in
         listen=1
         # bitcoin's 800,000 WU block limit; leave room for the pool's payout tx
         blockmaxweight=785000
+        maxuploadtarget=${toString cfg.maxUploadTarget}
         # the gateway reads the RPC cookie as a member of the bitcoind group
         rpccookieperms=group
         # block notifications go to the gateway's API; DATUM does not use ZMQ
