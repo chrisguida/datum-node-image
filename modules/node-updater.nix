@@ -89,7 +89,7 @@ let
       fi
     done
     [ "$nkeys" -gt 0 ] || fail "no release keys in $KEYS"
-    log "$nkeys release key(s): $(gpg --batch --list-keys --with-colons 2>/dev/null | awk -F: '/^fpr/ {print $10}' | tr '\n' ' ')"
+    log "$nkeys release key(s): $(gpg --batch --list-keys --with-colons 2>/dev/null | awk -F: '$1 == "pub" { p = 1; next } $1 == "fpr" && p { print $10; p = 0 }' | tr '\n' ' ')"
 
     # ---- fetch the tag (shallow) ------------------------------------------------------------
     export GIT_TERMINAL_PROMPT=0
