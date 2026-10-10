@@ -398,6 +398,9 @@ let
       e2fsprogs
       lkl
       fakeroot
+      findutils
+      sqlite
+      zerofree
       config.system.build.nixos-install
       nixos-enter
       nix
@@ -528,6 +531,15 @@ let
 
     ${lib.optionalString (additionalPaths' != [ ]) ''
       nix --extra-experimental-features nix-command copy --to $root --no-check-sigs ${lib.concatStringsSep " " additionalPaths'}
+    ''}
+
+    ${lib.optionalString deterministic ''
+      # datum-node-image: the Nix database records when each path was registered (build time)
+      db=$root/nix/var/nix/db/db.sqlite
+      if [ -f "$db" ]; then
+        sqlite3 "$db" "PRAGMA journal_mode=truncate; UPDATE ValidPaths SET registrationTime=1; VACUUM;" >/dev/null
+        rm -f "$db-shm" "$db-wal" "$db-journal"
+      fi
     ''}
 
     diskImage=nixos.raw
@@ -800,6 +812,11 @@ let
           # nix builds in the target image if sandboxing is turned off (through
           # __noChroot for example).
           export HOME=$TMPDIR
+          ${lib.optionalString deterministic ''
+            # datum-node-image: without this nix opens its database in WAL mode and leaves a -shm file
+            # whose allocated size varies, which moves every file written after it
+            export NIX_CONFIG="use-sqlite-wal = false"
+          ''}
           NIXOS_INSTALL_BOOTLOADER=1 nixos-enter --root $mountPoint -- /nix/var/nix/profiles/system/bin/switch-to-configuration boot
         ''}
 
@@ -818,6 +835,12 @@ let
           fi
         done
 
+        ${lib.optionalString (fsType == "ext4" && deterministic) ''
+          # datum-node-image: everything created or changed in this VM carries the VM clock (year 2000 plus
+          # however long the steps took); remember those inodes so their times can be fixed below
+          rm -f $mountPoint/nix/var/nix/db/db.sqlite-shm $mountPoint/nix/var/nix/db/db.sqlite-wal
+          find $mountPoint -xdev -newerct '1990-01-01' -printf '%i\n' | sort -n > /vm-inodes
+        ''}
         umount -R /mnt
 
         # Make sure resize2fs works. Note that resize2fs has stricter criteria for resizing than a normal
@@ -826,6 +849,26 @@ let
         # In deterministic mode, this is fixed to 1970-01-01 (UNIX timestamp 0).
         # This two-step approach is necessary otherwise `tune2fs` will want a fresher filesystem to perform
         # some changes.
+        ${lib.optionalString (fsType == "ext4" && deterministic) ''
+          # datum-node-image: one fixed time on every inode the VM touched, deleted inodes wiped, a fresh
+          # (zeroed) journal, and zeros in every free block
+          {
+            while read -r i; do
+              for f in atime ctime mtime crtime; do
+                echo "sif <$i> $f @946684800"
+                echo "sif <$i> ''${f}_extra 0"
+              done
+            done < /vm-inodes
+            dumpe2fs $rootDisk 2>/dev/null | sed -n 's/^  Free inodes: //p' | tr ',' '\n' | tr -d ' ' | while read -r r; do
+              [ -n "$r" ] || continue
+              seq "''${r%-*}" "''${r#*-}"
+            done | sed 's/.*/clri <&>/'
+          } > /scrub.cmds
+          debugfs -w -f /scrub.cmds $rootDisk > /dev/null 2>&1
+          tune2fs -O ^has_journal $rootDisk
+          tune2fs -O has_journal $rootDisk
+          zerofree $rootDisk
+        ''}
         ${lib.optionalString (fsType == "ext4") ''
           tune2fs -T now ${lib.optionalString deterministic "-U ${rootFSUID}"} -c 0 -i 0 $rootDisk
           ${lib.optionalString deterministic "tune2fs -f -T 19700101 $rootDisk"}
@@ -834,6 +877,7 @@ let
             for kv in "mkfs_time 0" "mtime 0" "wtime 0" "kbytes_written 0"; do
               debugfs -w -R "set_super_value $kv" $rootDisk
             done
+            e2fsck -fn $rootDisk
           ''}
         ''}
       ''
