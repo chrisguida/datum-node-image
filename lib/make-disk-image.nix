@@ -627,6 +627,11 @@ let
 
     ${partitionDiskScript}
 
+    ${lib.optionalString (deterministic && lib.hasPrefix "legacy" partitionTableType) ''
+      # datum-node-image: parted writes a random 32-bit disk signature into an msdos label
+      printf '\x64\x6e\x69\x31' | dd of=$diskImage bs=1 seek=440 conv=notrunc status=none
+    ''}
+
     ${lib.optionalString (partitionTableType != "none") ''
       # Get start & length of the root partition in sectors to $START and $SECTORS.
       eval $(partx $diskImage -o START,SECTORS --nr ${rootPartition} --pairs)
@@ -749,8 +754,9 @@ let
 
         mountPoint=/mnt
         mkdir $mountPoint
-        # datum-node-image: no delayed allocation, so what the VM writes lands in program order
-        mount ${lib.optionalString (fsType == "ext4" && deterministic) "-o nodelalloc "}$rootDisk $mountPoint
+        # datum-node-image: no delayed allocation, so what the VM writes lands in program order; no
+        # access-time updates, or every file the VM merely reads gets a new timestamp
+        mount ${lib.optionalString (fsType == "ext4" && deterministic) "-o nodelalloc,noatime "}$rootDisk $mountPoint
 
         # Create the ESP and mount it. Unlike e2fsprogs, mkfs.vfat doesn't support an
         # '-E offset=X' option, so we can't do this outside the VM.
