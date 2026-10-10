@@ -632,12 +632,22 @@ let
           echo "populating image with mke2fs -d..."
           find "$root" -exec touch -h -d @1 {} +
           export E2FSPROGS_FAKE_TIME=1
+          ${
+            if partitionTableType != "none" then
+              ''
+                mkfsExt="offset=$(sectorsToBytes $START),hash_seed=${rootFSUID}"
+                mkfsSize="$(sectorsToKilobytes $SECTORS)K"
+              ''
+            else
+              ''
+                mkfsExt="hash_seed=${rootFSUID}"
+                mkfsSize=""
+              ''
+          }
           fakeroot -- sh -ec '
             chown -R 0:0 "$1"
-            mkfs.ext4 -b ${blockSize} -F -L ${label} -U ${rootFSUID} -d "$1" "$2" \
-              -E ${lib.optionalString (partitionTableType != "none") "offset=$(sectorsToBytes $START),"}hash_seed=${rootFSUID} \
-              ${lib.optionalString (partitionTableType != "none") "$(sectorsToKilobytes $SECTORS)K"}
-          ' _ "$root${lib.optionalString onlyNixStore builtins.storeDir}" "$diskImage" ||
+            mkfs.ext4 -b ${blockSize} -F -L ${label} -U ${rootFSUID} -d "$1" -E "$3" "$2" $4
+          ' _ "$root${lib.optionalString onlyNixStore builtins.storeDir}" "$diskImage" "$mkfsExt" "$mkfsSize" ||
             (echo >&2 "ERROR: mke2fs -d failed. diskSize might be too small for closure."; exit 1)
         ''
       else
