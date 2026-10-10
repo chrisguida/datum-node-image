@@ -46,6 +46,7 @@
             self.nixosModules.node-wizard
             self.nixosModules.fast-start
             self.nixosModules.image-info
+            self.nixosModules.node-updater
             ./hosts/common.nix
           ]
           ++ extraModules;
@@ -75,6 +76,7 @@
         node-wizard = ./modules/node-wizard.nix;
         fast-start = ./modules/fast-start.nix;
         image-info = ./modules/image-info.nix;
+        node-updater = ./modules/node-updater.nix;
       };
 
       nixosConfigurations = {

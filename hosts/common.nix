@@ -62,9 +62,11 @@ in
   };
 
   services.blake2b-node.enable = true;
-  # The Knots build: 29.4.2 plus the 976,000 assumeutxo entry (#444), the attested Guix tarball
-  # (pkgs/bitcoind-knots-976000-bin.nix), not a source build. pkgs.bitcoind-knots-bin is the official 29.4.2.
-  services.blake2b-node.knotsPackage = pkgs.bitcoind-knots-976000-bin;
+  # Two attested Guix tarballs are bundled (services.blake2b-node.knotsBuilds): "assumeutxo-976000", 29.4.2
+  # plus the 976,000 assumeutxo entry (#444, pkgs/bitcoind-knots-976000-bin.nix), runs by default;
+  # "official" is the unmodified 29.4.2 (pkgs/bitcoind-knots-bin.nix). The setup page switches between
+  # them at runtime through /var/lib/datum-wizard/knots-build; no source build.
+  services.blake2b-node.knotsBuildDefault = "assumeutxo-976000";
   # assumeutxo fast start: snapshot taken 2026-10-02 from a synced unpruned Knots 29.4.2
   # (dumptxoutset type=latest); the build above carries the chainparams entry until it is upstream
   services.blake2b-node.fastStart = {
@@ -83,6 +85,9 @@ in
   };
   # first-boot setup page on https://<ip>/ (self-signed certificate), http redirects
   services.node-wizard.enable = true;
+  # the setup page's "Update" button: fetch a signed release tag, verify it against data/release-keys,
+  # build this variant from it and switch, rolling back if the node does not come up
+  services.node-updater.enable = true;
 
   environment.systemPackages = with pkgs; [
     vim
