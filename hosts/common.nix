@@ -74,8 +74,10 @@ in
     blockhash = "000000000000000098441aee029573795681eb1602c75271e809b136e9217373";
     utxoHash = "dbd67717d3f108e4fbd8b4f9efc4057cac11a0ba7c23584b43cca42c9edb7118";
     chainTxCount = 1417215373;
-    url = "https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-976000.dat";
-    torrentUrl = "https://mb-beast.tail4a715.ts.net:8443/datum-node-image/utxo-976000.dat.torrent";
+    # the same file AlphaPool publishes for its installer (sha256 identical); the torrent ships in the
+    # image (data/, info hash 3cf7e4d15841f116856f6f19bf2ac15b1dbae2c3) with that URL as its web seed
+    url = "https://snapshots.alphapool.tech:8444/xbt/utxo-976000.dat";
+    torrentFile = ../data/utxo-976000.dat.torrent;
     sha256 = "bfd2460a55ae1d2e94b9957ccd512ae027855feed1dbef996cfed0abebe5d123";
     sizeBytes = 9517597408;
   };

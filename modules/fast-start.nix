@@ -20,6 +20,7 @@ let
   # aria2 gives up the whole torrent when it cannot bind its listen port, so it gets a range and takes the first
   # free one (the same range is open in the firewall).
   portRange = "${toString cfg.torrentPort}-${toString (cfg.torrentPort + 8)}";
+  useTorrent = cfg.torrentFile != null || cfg.torrentUrl != null;
   progressFile = "${stateDir}/progress.json";
   script = pkgs.writeShellScript "bitcoind-fast-start" ''
     set -u
@@ -67,10 +68,15 @@ let
     if [ "$have" -lt ${toString cfg.sizeBytes} ]; then
       progress downloading 0 ""
       downloaded=0
-      ${lib.optionalString (cfg.torrentUrl != null) ''
+      ${lib.optionalString useTorrent ''
         # BitTorrent first: peers plus the HTTPS web seed in the torrent. aria2 names
         # the file after the torrent; stop seeding as soon as the download is complete.
-        if curl -fsSL --retry 5 -o "$STATE/snapshot.torrent" ${lib.escapeShellArg cfg.torrentUrl}; then
+        if ${
+          if cfg.torrentFile != null then
+            "cp ${cfg.torrentFile} \"$STATE/snapshot.torrent\""
+          else
+            "curl -fsSL --retry 5 -o \"$STATE/snapshot.torrent\" ${lib.escapeShellArg cfg.torrentUrl}"
+        }; then
           tname=$(aria2c --show-files "$STATE/snapshot.torrent" 2>/dev/null | grep -oE '^ *1\|.*' | sed 's/^ *1|//' | head -1)
           tname=''${tname:-${baseNameOf cfg.url}}
           aria2c --dir="$STATE" --seed-time=0 --bt-stop-timeout=600 --check-integrity=true \
@@ -175,6 +181,11 @@ in
       type = lib.types.str;
       description = "Where the snapshot file is served.";
     };
+    torrentFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "A .torrent for the snapshot shipped inside the image (web seed + peers); tried before the plain download. Takes precedence over torrentUrl.";
+    };
     torrentUrl = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -183,7 +194,7 @@ in
     torrentPort = lib.mkOption {
       type = lib.types.port;
       default = 6881;
-      description = "First of nine TCP/UDP ports aria2 may listen on while downloading the snapshot (opened in the firewall when torrentUrl is set); it takes the first free one.";
+      description = "First of nine TCP/UDP ports aria2 may listen on while downloading the snapshot (opened in the firewall when a torrent is configured); it takes the first free one.";
     };
     sha256 = lib.mkOption {
       type = lib.types.str;
@@ -221,7 +232,7 @@ in
       )
     );
 
-    networking.firewall = lib.mkIf (cfg.torrentUrl != null) {
+    networking.firewall = lib.mkIf useTorrent {
       allowedTCPPortRanges = [ { from = cfg.torrentPort; to = cfg.torrentPort + 8; } ];
       allowedUDPPortRanges = [ { from = cfg.torrentPort; to = cfg.torrentPort + 8; } ];
     };
