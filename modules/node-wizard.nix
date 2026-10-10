@@ -17,6 +17,8 @@ let
   poolsJson = pkgs.writeText "pools.json" (builtins.toJSON cfg.pools);
   settingsDir = "/var/lib/datum-wizard";
   gatewayKind = if node.gateway or "" == "ratum" then "ratum" else "c";
+  bitcoindUnit = "bitcoind-${cfg.bitcoindInstance}.service";
+  updaterUnit = "node-updater.service";
 in
 {
   options.services.node-wizard = {
@@ -78,6 +80,12 @@ in
       type = lib.types.bool;
       default = true;
     };
+
+    releasesURL = lib.mkOption {
+      type = lib.types.str;
+      default = "https://api.github.com/repos/chrisguida/datum-node-image/releases";
+      description = "GitHub releases API endpoint listed on the Update page (unauthenticated, cached ten minutes).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -102,10 +110,30 @@ in
     };
     users.groups.node-wizard = { };
 
-    # setgid dir: files the wizard creates belong to the datum-gateway group
+    # setgid dir: files the wizard creates belong to the datum-gateway group. The directory is
+    # traversable by everyone because bitcoind's wrapper reads the Knots build selector here; the
+    # gateway settings file itself (it holds the gateway's admin password) stays group-only (0640).
     systemd.tmpfiles.rules = [
-      "d ${settingsDir} 2750 node-wizard datum-gateway - -"
+      "d ${settingsDir} 2755 node-wizard datum-gateway - -"
     ];
+
+    # The wizard restarts the node after a Knots build switch and starts the updater, as user
+    # node-wizard over D-Bus. polkit allows exactly those two units and nothing else.
+    security.polkit.enable = true;
+    security.polkit.extraConfig = ''
+      /* node-wizard: restart the node after a Knots build switch, start the image updater */
+      polkit.addRule(function(action, subject) {
+        if (action.id == "org.freedesktop.systemd1.manage-units" &&
+            subject.user == "node-wizard") {
+          var unit = action.lookup("unit");
+          var verb = action.lookup("verb");
+          if ((unit == "${bitcoindUnit}" && (verb == "restart" || verb == "start")) ||
+              (unit == "${updaterUnit}" && verb == "start")) {
+            return polkit.Result.YES;
+          }
+        }
+      });
+    '';
 
     environment.etc."node-wizard/pools.json".source = poolsJson;
 
@@ -144,6 +172,15 @@ in
           "-dashboard-listen :${toString cfg.dashboardPort}"
           "-console-devices ${lib.concatStringsSep "," cfg.consoleDevices}"
           "-fast-start-progress ${bitcoind.dataDir}/fast-start/progress.json"
+          "-knots-builds /etc/datum-node-image/knots-builds.json"
+          "-knots-selector ${node.knotsBuildSelector or "${settingsDir}/knots-build"}"
+          "-knots-running /run/bitcoind-${cfg.bitcoindInstance}/knots-build"
+          "-image-info /etc/datum-node-image/image.json"
+          "-update-request ${settingsDir}/update-request"
+          "-updater-unit ${updaterUnit}"
+          "-updater-status /var/lib/node-updater/status"
+          "-updater-log /var/lib/node-updater/last.log"
+          "-releases-url ${lib.escapeShellArg cfg.releasesURL}"
         ];
         Restart = "on-failure";
         RestartSec = "3s";

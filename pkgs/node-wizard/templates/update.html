@@ -1,0 +1,106 @@
+{{define "update"}}{{template "head" .}}
+{{template "nav" .}}
+<main>
+{{$u := .Update}}
+<div class="card">
+<h1>{{.T "update_heading"}}</h1>
+{{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+{{if .Notice}}<div class="ok">{{.Notice}}</div>{{end}}
+<h2>{{.T "image"}}</h2>
+<div class="row"><span class="k">{{.T "image_rev"}}</span><span class="v"><code>{{$u.Rev}}</code></span></div>
+<div class="row"><span class="k">{{.T "image_variant"}}</span><span class="v">{{$u.Variant}}</span></div>
+<div class="row"><span class="k">{{.T "image_snapshot"}}</span><span class="v">{{if $u.SnapshotPin}}{{$u.SnapshotPin}}{{else}}{{.T "image_snapshot_none"}}{{end}}</span></div>
+</div>
+
+<div class="card">
+<h2>{{.T "knots_build"}}</h2>
+{{if $u.Error}}<div class="err">{{$u.Error}}</div>{{else}}
+<div class="row"><span class="k">{{.T "knots_running"}}</span><span class="v">{{$u.Running.Name}}{{if not $u.RunningKnown}} <span class="warn">{{.T "knots_running_unknown"}}</span>{{end}}</span></div>
+<div class="row"><span class="k">{{.T "knots_version"}}</span><span class="v">{{$u.Running.Version}}</span></div>
+<div class="row"><span class="k">{{.T "knots_heights"}}</span><span class="v">{{$u.Running.Heights}}</span></div>
+<div class="row"><span class="k">{{.T "knots_selected"}}</span><span class="v">{{$u.Selected}}</span></div>
+<div class="row"><span class="k">{{.T "node_snapshot"}}</span><span class="v">{{$u.SnapshotLine}}</span></div>
+<p class="note"><code>{{$u.Running.Store}}</code></p>
+{{if $u.Others}}
+<h2 style="margin-top:18px">{{.T "knots_other_builds"}}</h2>
+{{range $u.Others}}
+<div class="row" style="display:block">
+<div style="display:flex;justify-content:space-between;gap:12px"><span class="v" style="text-align:left">{{.Name}}</span><span class="k">{{.Version}}</span></div>
+<small>{{$.T "knots_heights"}}: {{.Heights}}</small>
+<small><code>{{.Store}}</code></small>
+<form method="post" action="/update" onsubmit="return confirm({{$.T "knots_switch_confirm"}})">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="action" value="switch">
+<input type="hidden" name="build" value="{{.Name}}">
+<button type="submit" {{if not .CanSwitch}}disabled style="background:#c9ced6;cursor:not-allowed"{{end}}>{{$.T "knots_switch"}} {{.Name}}</button>
+{{if not .CanSwitch}}<small class="warn">{{.Reason}}</small>{{end}}
+</form>
+</div>
+{{end}}
+{{end}}
+{{end}}
+</div>
+
+<div class="card">
+<h2>{{.T "image_update"}}</h2>
+<p class="note">{{.T "update_intro"}}</p>
+<p class="note">{{.T "update_signout_note"}}</p>
+
+<h2 style="margin-top:18px">{{.T "update_status"}}</h2>
+<div class="row"><span class="k">{{.T "update_status"}}</span><span class="v"><span id="upd-state" class="{{if eq $u.Status.State "failed"}}bad{{else if eq $u.Status.State "ok"}}good{{else if eq $u.Status.State "running"}}warn{{end}}">{{$u.StateLabel}}</span> <span id="upd-tag">{{$u.Status.Tag}}</span></span></div>
+<p class="note" id="upd-msg">{{$u.Status.Message}}</p>
+<p class="note" id="upd-when">{{$u.StatusTime}}</p>
+<details {{if $u.UpdaterActive}}open{{end}}><summary class="note">{{.T "update_log"}}</summary>
+<pre id="upd-log" style="font-size:.8rem;white-space:pre-wrap;word-break:break-all;background:#eef0f3;padding:10px;border-radius:8px;max-height:320px;overflow:auto">{{$u.Log}}</pre></details>
+
+<h2 style="margin-top:18px">{{.T "releases"}}</h2>
+{{if $u.ReleasesError}}<p class="note warn">{{printf (.T "releases_unavailable") $u.ReleasesError}}</p>{{end}}
+{{if and (not $u.Releases) (not $u.ReleasesError)}}<p class="note">{{.T "no_releases"}}</p>{{end}}
+{{range $u.Releases}}
+<div class="row" style="display:block">
+<div style="display:flex;justify-content:space-between;gap:12px"><span class="v" style="text-align:left"><a href="{{.URL}}" target="_blank" rel="noopener">{{.Tag}}</a>{{if .Prerelease}} <span class="warn">({{$.T "prerelease"}})</span>{{end}}</span><span class="k">{{if .Date}}{{$.T "published"}} {{.Date}}{{end}}</span></div>
+{{if .Name}}<small>{{.Name}}</small>{{end}}
+{{if .Notes}}<pre class="note" style="white-space:pre-wrap;margin:6px 0;font-family:inherit">{{.Notes}}</pre>{{end}}
+<form method="post" action="/update" onsubmit="return confirm({{printf ($.T "update_confirm") .Tag}})">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="action" value="update">
+<input type="hidden" name="tag" value="{{.Tag}}">
+<button type="submit" {{if $u.UpdaterActive}}disabled style="background:#c9ced6;cursor:not-allowed"{{end}}>{{printf ($.T "update_to") .Tag}}</button>
+</form>
+</div>
+{{end}}
+
+<form method="post" action="/update" autocomplete="off" onsubmit="return confirm({{printf (.T "update_confirm") "%TAG%"}}.replace('%TAG%', this.tag.value))">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="action" value="update">
+<label for="tag">{{.T "update_tag"}}</label>
+<input id="tag" name="tag" value="{{index .Form "tag"}}" placeholder="v1.0.0" spellcheck="false" pattern="v[0-9A-Za-z._-]+" required>
+<small>{{.T "update_tag_help"}}</small>
+<button type="submit" {{if $u.UpdaterActive}}disabled style="background:#c9ced6;cursor:not-allowed"{{end}}>{{.T "update_start"}}</button>
+</form>
+</div>
+</main>
+<script>
+(function(){
+  var st=document.getElementById('upd-state'),tag=document.getElementById('upd-tag'),msg=document.getElementById('upd-msg'),when=document.getElementById('upd-when'),log=document.getElementById('upd-log');
+  var labels={idle:{{.T "state_idle"}},running:{{.T "state_running"}},ok:{{.T "state_ok"}},failed:{{.T "state_failed"}}};
+  var cls={failed:'bad',ok:'good',running:'warn',idle:''};
+  var wasActive={{$u.UpdaterActive}};
+  function poll(){
+    fetch('/api/update-status',{credentials:'same-origin',cache:'no-store'}).then(function(r){
+      if(!r.ok||r.redirected){throw new Error('session');}
+      return r.json();
+    }).then(function(d){
+      var s=d.status||{};var state=d.active?'running':(s.state||'idle');
+      st.textContent=labels[state]||state;st.className=cls[state]||'';
+      tag.textContent=s.tag||'';msg.textContent=s.message||'';
+      when.textContent=s.timestamp?new Date(s.timestamp*1000).toISOString().replace('T',' ').slice(0,16)+' UTC':'';
+      log.textContent=d.log||'';
+      if(wasActive&&!d.active){location.reload();}
+      wasActive=d.active;
+    }).catch(function(){msg.textContent={{.T "session_lost"}};});
+  }
+  setInterval(poll,5000);
+})();
+</script>
+{{template "foot" .}}{{end}}

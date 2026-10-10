@@ -19,6 +19,7 @@ buildGoModule {
       ./poolstats.go
       ./hashrate.go
       ./dashboard.go
+      ./update.go
       ./locales
       ./templates
     ];

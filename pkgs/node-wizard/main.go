@@ -56,6 +56,16 @@ type config struct {
 	DashboardListen string
 	SampleInterval  time.Duration
 	FastStartFile   string
+	// the Update page
+	KnotsBuildsFile   string
+	KnotsSelectorFile string
+	KnotsRunningFile  string
+	ImageInfoFile     string
+	UpdateRequestFile string
+	UpdaterUnit       string
+	UpdaterStatusFile string
+	UpdaterLogFile    string
+	ReleasesURL       string
 }
 
 type gatewayChoice struct {
@@ -82,23 +92,24 @@ type poolEntry struct {
 	Host   string `json:"host"`
 	Port   int    `json:"port"`
 	Pubkey string `json:"pubkey"`
-	URL    string `json:"url"`   // per-miner page; {address} is substituted
-	Stats  string `json:"stats"` // JSON endpoint (ratum pool schema) or API base (lazarus schema)
+	URL    string `json:"url"`    // per-miner page; {address} is substituted
+	Stats  string `json:"stats"`  // JSON endpoint (ratum pool schema) or API base (lazarus schema)
 	Schema string `json:"schema"` // "" or "ratum" (one JSON document), "lazarus" (/pool, /miner/<addr>, /blocks)
 }
 
 type App struct {
-	cfg        config
-	mu         sync.Mutex
-	state      state
-	setupCode  string
-	pools      []poolEntry
-	tmpl       *template.Template
-	sessions   *sessions
-	limiter    *limiter
-	httpClient *http.Client
-	hashrate   *hashrateLog
-	poolCache  *poolStatsCache
+	cfg          config
+	mu           sync.Mutex
+	state        state
+	setupCode    string
+	pools        []poolEntry
+	tmpl         *template.Template
+	sessions     *sessions
+	limiter      *limiter
+	httpClient   *http.Client
+	hashrate     *hashrateLog
+	poolCache    *poolStatsCache
+	releaseCache *releaseCache
 }
 
 type pageData struct {
@@ -116,6 +127,7 @@ type pageData struct {
 	DashboardURL  string
 	Pool          *poolStatsView
 	HashrateSVG   template.HTML
+	Update        *updateView
 }
 
 func (p pageData) T(k string) string { return tr(p.Lang, k) }
@@ -158,6 +170,15 @@ func main() {
 	flag.StringVar(&cfg.DashboardListen, "dashboard-listen", ":7443", "HTTPS listen address for the proxied gateway dashboard; empty disables")
 	flag.DurationVar(&cfg.SampleInterval, "sample-interval", 60*time.Second, "how often the gateway hashrate is sampled for the chart")
 	flag.StringVar(&cfg.FastStartFile, "fast-start-progress", "/var/lib/bitcoind-blake2b/fast-start/progress.json", "progress file of the assumeutxo fast start; empty disables")
+	flag.StringVar(&cfg.KnotsBuildsFile, "knots-builds", "/etc/datum-node-image/knots-builds.json", "bundled Knots builds (written by the blake2b-node module)")
+	flag.StringVar(&cfg.KnotsSelectorFile, "knots-selector", "/var/lib/datum-wizard/knots-build", "selector file naming the Knots build to run")
+	flag.StringVar(&cfg.KnotsRunningFile, "knots-running", "/run/bitcoind-blake2b/knots-build", "file where bitcoind's wrapper records the running build")
+	flag.StringVar(&cfg.ImageInfoFile, "image-info", "/etc/datum-node-image/image.json", "image revision, variant and snapshot pins")
+	flag.StringVar(&cfg.UpdateRequestFile, "update-request", "/var/lib/datum-wizard/update-request", "file the updater reads the requested tag from")
+	flag.StringVar(&cfg.UpdaterUnit, "updater-unit", "node-updater.service", "")
+	flag.StringVar(&cfg.UpdaterStatusFile, "updater-status", "/var/lib/node-updater/status", "updater status JSON")
+	flag.StringVar(&cfg.UpdaterLogFile, "updater-log", "/var/lib/node-updater/last.log", "updater log")
+	flag.StringVar(&cfg.ReleasesURL, "releases-url", "https://api.github.com/repos/chrisguida/datum-node-image/releases", "GitHub releases API; empty disables the list")
 	flag.Parse()
 	if consoles != "" {
 		cfg.ConsoleDevices = strings.Split(consoles, ",")
@@ -198,6 +219,7 @@ func main() {
 	}
 	app.hashrate = loadHashrateLog(filepath.Join(cfg.StateDir, "hashrate.json"))
 	app.poolCache = newPoolStatsCache()
+	app.releaseCache = &releaseCache{}
 	go app.consoleLoop()
 	go app.sampleLoop()
 	if cfg.DashboardListen != "" {
@@ -213,6 +235,8 @@ func main() {
 	mux.HandleFunc("/status", app.requireAuth(app.handleStatus))
 	mux.HandleFunc("/api/status", app.requireAuth(app.handleAPIStatus))
 	mux.HandleFunc("/settings", app.requireAuth(app.handleSettings))
+	mux.HandleFunc("/update", app.requireAuth(app.handleUpdate))
+	mux.HandleFunc("/api/update-status", app.requireAuth(app.handleAPIUpdateStatus))
 	mux.HandleFunc("/qr.png", app.requireAuth(app.handleQR))
 
 	if cfg.HTTPListen != "" {
