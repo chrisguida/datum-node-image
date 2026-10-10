@@ -714,7 +714,7 @@ let
     '
     rm old.part
     db=tree/nix/var/nix/db
-    rm -f $db/db.sqlite $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal
+    rm -f $db/db.sqlite $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal $db/schema
     NIX_STATE_DIR=$PWD/tree/nix/var/nix nix-store --option use-sqlite-wal false --load-db < ${closureInfo}/registration
     sqlite3 $db/db.sqlite "UPDATE ValidPaths SET registrationTime=1; VACUUM;" >/dev/null
     rm -f $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal
