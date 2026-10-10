@@ -31,7 +31,7 @@ let
         pkgs.aria2
         pkgs.jq
         pkgs.gnugrep
-        node.knotsPackage
+        node.knotsRuntimePackage
       ]
     }
     STATE=${stateDir}

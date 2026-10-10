@@ -16,6 +16,73 @@ let
   inst = "blake2b";
   bitcoind = config.services.bitcoind.${inst};
   pool = if cfg.pool == "custom" then cfg.customPool else pools.${cfg.pool};
+  isX86 = pkgs.stdenv.hostPlatform.isx86_64;
+
+  # ---- Knots build selection -------------------------------------------------------------------
+  builds = cfg.knotsBuilds;
+  defaultBuild =
+    builds.${cfg.knotsBuildDefault}
+      or (throw "services.blake2b-node.knotsBuildDefault (${cfg.knotsBuildDefault}) is not a name in services.blake2b-node.knotsBuilds (${lib.concatStringsSep ", " (builtins.attrNames builds)})");
+  buildInfo = lib.mapAttrs (name: p: {
+    version = p.version or "unknown";
+    assumeutxoHeights = p.assumeutxoHeights or [ ];
+    store = "${p}";
+  }) builds;
+  # bin/bitcoind: read the selector, validate the name against the bundled builds, exec that build.
+  # Every build's store path is spelled out here, which is what keeps them all in the closure. When run
+  # by systemd with a RuntimeDirectory, the chosen name is left in $RUNTIME_DIRECTORY/knots-build so the
+  # setup page can show which build is running.
+  switchScript = pkgs.writeShellScript "bitcoind-knots-switch" ''
+    set -u
+    selector=${lib.escapeShellArg cfg.knotsBuildSelector}
+    default=${lib.escapeShellArg cfg.knotsBuildDefault}
+    name=""
+    if [ -r "$selector" ]; then
+      IFS= read -r name < "$selector" || true
+    fi
+    name=''${name//[[:space:]]/}
+    case "$name" in
+    ${lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (n: p: "  ${lib.escapeShellArg n}) exe=${lib.escapeShellArg "${p}/bin/bitcoind"} ;;") builds
+    )}
+      "")
+        name=$default
+        exe=${lib.escapeShellArg "${defaultBuild}/bin/bitcoind"}
+        ;;
+      *)
+        echo "bitcoind-knots-switch: unknown Knots build '$name' in $selector, running the default ($default)" >&2
+        name=$default
+        exe=${lib.escapeShellArg "${defaultBuild}/bin/bitcoind"}
+        ;;
+    esac
+    if [ -n "''${RUNTIME_DIRECTORY:-}" ] && [ -d "$RUNTIME_DIRECTORY" ]; then
+      printf '%s\n' "$name" > "$RUNTIME_DIRECTORY/knots-build" 2>/dev/null || true
+    fi
+    exec "$exe" "$@"
+  '';
+  switcher =
+    pkgs.runCommand "bitcoind-knots-switch-${defaultBuild.version or "unknown"}"
+      {
+        passthru = {
+          version = defaultBuild.version or "unknown";
+          assumeutxoHeights = defaultBuild.assumeutxoHeights or [ ];
+          inherit builds;
+        };
+        meta = {
+          description = "Bitcoin Knots, the build named in ${cfg.knotsBuildSelector} (${lib.concatStringsSep ", " (builtins.attrNames builds)})";
+          mainProgram = "bitcoind";
+        };
+      }
+      ''
+        mkdir -p $out/bin
+        for f in ${defaultBuild}/bin/*; do
+          n=$(basename "$f")
+          [ "$n" = bitcoind ] || ln -s "$f" "$out/bin/$n"
+        done
+        cp ${switchScript} $out/bin/bitcoind
+        chmod 755 $out/bin/bitcoind
+      '';
+  runtimePackage = if builtins.length (builtins.attrNames builds) == 1 then defaultBuild else switcher;
   gatewayPackage =
     {
       convoy = pkgs.datum-gateway-convoy;
@@ -46,10 +113,65 @@ in
     enable = lib.mkEnableOption "a pruned bitcoin (Knots) node + DATUM gateway";
 
     knotsPackage = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = null;
+      description = ''
+        One Bitcoin Knots build to run, with no runtime choice. When set, `knotsBuilds` holds just this
+        package and bitcoind runs it directly. Leave null (the default) to bundle every build in
+        `knotsBuilds` and pick one at service start through the selector file.
+      '';
+    };
+
+    knotsBuilds = lib.mkOption {
+      type = lib.types.attrsOf lib.types.package;
+      default =
+        if cfg.knotsPackage != null then
+          { ${cfg.knotsBuildDefault} = cfg.knotsPackage; }
+        else
+          {
+            official = pkgs.bitcoind-knots-bin;
+          }
+          // lib.optionalAttrs isX86 {
+            assumeutxo-976000 = pkgs.bitcoind-knots-976000-bin;
+          };
+      defaultText = lib.literalExpression ''
+        { official = pkgs.bitcoind-knots-bin; assumeutxo-976000 = pkgs.bitcoind-knots-976000-bin; }  # x86_64
+      '';
+      description = ''
+        Bitcoin Knots builds bundled in the image, by name. All of them are in the system closure; the one
+        that runs is named in the selector file (`knotsBuildSelector`) and can be changed from the setup page
+        without a rebuild, falling back to `knotsBuildDefault`. bitcoin-cli and the other tools come from
+        the default build (the RPC interface is the same).
+      '';
+    };
+
+    knotsBuildDefault = lib.mkOption {
+      type = lib.types.str;
+      default =
+        if cfg.knotsPackage != null then
+          lib.getName cfg.knotsPackage
+        else if isX86 then
+          "assumeutxo-976000"
+        else
+          "official";
+      defaultText = lib.literalExpression ''"assumeutxo-976000"'';
+      description = "Name in `knotsBuilds` that runs when the selector file is missing or names an unknown build.";
+    };
+
+    knotsBuildSelector = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/datum-wizard/knots-build";
+      description = "File holding the name of the Knots build to run (one line). Written by the setup page.";
+    };
+
+    knotsRuntimePackage = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.bitcoind-knots-bin;
-      defaultText = lib.literalExpression "pkgs.bitcoind-knots-bin";
-      description = "Bitcoin Knots build. The default is the official release tarball; `pkgs.bitcoind-knots` (nixpkgs source build) also works.";
+      readOnly = true;
+      description = ''
+        What `services.bitcoind` actually runs: the single build when there is one, otherwise a wrapper
+        whose bin/bitcoind reads the selector file and execs the chosen build. Use it wherever the
+        node's binaries are wanted (bitcoin-cli, the `bcli` alias).
+      '';
     };
 
     prune = lib.mkOption {
@@ -138,9 +260,24 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    services.blake2b-node.knotsRuntimePackage = runtimePackage;
+
+    # what the setup page reads to offer the switch
+    environment.etc."datum-node-image/knots-builds.json".text = builtins.toJSON {
+      default = cfg.knotsBuildDefault;
+      selector = cfg.knotsBuildSelector;
+      builds = buildInfo;
+    };
+
+    # the wrapper records the running build in /run/bitcoind-blake2b/knots-build
+    systemd.services."bitcoind-${inst}".serviceConfig = {
+      RuntimeDirectory = "bitcoind-${inst}";
+      RuntimeDirectoryMode = "0755";
+    };
+
     services.bitcoind.${inst} = {
       enable = true;
-      package = cfg.knotsPackage;
+      package = runtimePackage;
       prune = cfg.prune;
       dbCache = cfg.dbCache;
       extraConfig = ''
@@ -199,11 +336,11 @@ in
     networking.firewall.allowedTCPPorts = [ 8333 ];
 
     environment.systemPackages = [
-      cfg.knotsPackage
+      runtimePackage
       pkgs.jq
     ];
 
     # `bcli getblockchaininfo` for admins
-    environment.shellAliases.bcli = "sudo -u ${bitcoind.user} ${cfg.knotsPackage}/bin/bitcoin-cli -datadir=${bitcoind.dataDir}";
+    environment.shellAliases.bcli = "sudo -u ${bitcoind.user} ${runtimePackage}/bin/bitcoin-cli -datadir=${bitcoind.dataDir}";
   };
 }
