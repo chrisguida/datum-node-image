@@ -8,6 +8,13 @@
 {
   imports = [ ../modules/deterministic-image.nix ];
 
+  # Each variant records its own name (datum-node-image.variant -> /etc/datum-node-image/image.json),
+  # so a deployed system knows which image to rebuild when it updates itself. image.modules.<name>
+  # is nixpkgs' per-variant module list; these entries merge with its defaults.
+  image.modules = lib.genAttrs [ "digital-ocean" "qemu-efi" "raw-efi" "raw" ] (name: {
+    datum-node-image.variant = name;
+  });
+
   # The image variants (nixpkgs disk-image module) define the root filesystem
   # and bootloader themselves. These low-priority defaults only make the base
   # configuration evaluable on its own (`nix flake check`); every variant

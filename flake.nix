@@ -39,10 +39,13 @@
           modules = [
             { nixpkgs.hostPlatform = "x86_64-linux"; }
             { nixpkgs.overlays = [ overlay ]; }
+            # the revision this system was built from, for /etc/datum-node-image/image.json
+            { datum-node-image.rev = self.rev or self.dirtyRev or "unknown"; }
             self.nixosModules.datum-gateway
             self.nixosModules.blake2b-node
             self.nixosModules.node-wizard
             self.nixosModules.fast-start
+            self.nixosModules.image-info
             ./hosts/common.nix
           ]
           ++ extraModules;
@@ -71,6 +74,7 @@
         blake2b-node = ./modules/blake2b-node.nix;
         node-wizard = ./modules/node-wizard.nix;
         fast-start = ./modules/fast-start.nix;
+        image-info = ./modules/image-info.nix;
       };
 
       nixosConfigurations = {

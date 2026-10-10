@@ -6,6 +6,8 @@
 #     --flake .#blake2b-vps-anywhere --target-host root@<ip>
 { ... }:
 {
+  datum-node-image.variant = "anywhere";
+
   disko.devices.disk.main = {
     type = "disk";
     device = "/dev/vda";
