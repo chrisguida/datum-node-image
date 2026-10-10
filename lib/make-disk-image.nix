@@ -397,6 +397,7 @@ let
       parted
       e2fsprogs
       lkl
+      fakeroot
       config.system.build.nixos-install
       nixos-enter
       nix
@@ -614,26 +615,48 @@ let
 
     ${partitionDiskScript}
 
+    ${lib.optionalString (partitionTableType != "none") ''
+      # Get start & length of the root partition in sectors to $START and $SECTORS.
+      eval $(partx $diskImage -o START,SECTORS --nr ${rootPartition} --pairs)
+    ''}
     ${
-      if partitionTableType != "none" then
+      if fsType == "ext4" && deterministic then
         ''
-          # Get start & length of the root partition in sectors to $START and $SECTORS.
-          eval $(partx $diskImage -o START,SECTORS --nr ${rootPartition} --pairs)
-
-          mkfs.${fsType} -b ${blockSize} -F -L ${label} $diskImage -E offset=$(sectorsToBytes $START)${hashSeedOpt} $(sectorsToKilobytes $SECTORS)K
+          # datum-node-image: populate at mkfs time with e2fsprogs instead of cptofs. cptofs runs a
+          # kernel in userspace whose directory allocator picks a random block group for top-level
+          # directories, so every build laid the same files out differently; mke2fs -d walks the tree
+          # in sorted order with a deterministic allocator. fakeroot makes everything root-owned, as
+          # cptofs did. The UUID is given here so the metadata checksum seed derives from it (with
+          # metadata_csum_seed the seed of the random mkfs-time UUID would otherwise stay). Staged
+          # files get one fixed mtime; store paths already have it.
+          echo "populating image with mke2fs -d..."
+          find "$root" -exec touch -h -d @1 {} +
+          export E2FSPROGS_FAKE_TIME=1
+          fakeroot -- sh -ec '
+            chown -R 0:0 "$1"
+            mkfs.ext4 -b ${blockSize} -F -L ${label} -U ${rootFSUID} -d "$1" "$2" \
+              -E ${lib.optionalString (partitionTableType != "none") "offset=$(sectorsToBytes $START),"}hash_seed=${rootFSUID} \
+              ${lib.optionalString (partitionTableType != "none") "$(sectorsToKilobytes $SECTORS)K"}
+          ' _ "$root${lib.optionalString onlyNixStore builtins.storeDir}" "$diskImage" ||
+            (echo >&2 "ERROR: mke2fs -d failed. diskSize might be too small for closure."; exit 1)
         ''
       else
         ''
-          mkfs.${fsType} -b ${blockSize} -F -L ${label} $diskImage${lib.optionalString (hashSeedOpt != "") " -E ${lib.removePrefix "," hashSeedOpt}"}
+          ${
+            if partitionTableType != "none" then
+              "mkfs.${fsType} -b ${blockSize} -F -L ${label} $diskImage -E offset=$(sectorsToBytes $START)${hashSeedOpt} $(sectorsToKilobytes $SECTORS)K"
+            else
+              "mkfs.${fsType} -b ${blockSize} -F -L ${label} $diskImage${lib.optionalString (hashSeedOpt != "") " -E ${lib.removePrefix "," hashSeedOpt}"}"
+          }
+
+          echo "copying staging root to image..."
+          cptofs -p ${lib.optionalString (partitionTableType != "none") "-P ${rootPartition}"} \
+                 -t ${fsType} \
+                 -i $diskImage \
+                 $root${lib.optionalString onlyNixStore builtins.storeDir}/* / ||
+            (echo >&2 "ERROR: cptofs failed. diskSize might be too small for closure."; exit 1)
         ''
     }
-
-    echo "copying staging root to image..."
-    cptofs -p ${lib.optionalString (partitionTableType != "none") "-P ${rootPartition}"} \
-           -t ${fsType} \
-           -i $diskImage \
-           $root${lib.optionalString onlyNixStore builtins.storeDir}/* / ||
-      (echo >&2 "ERROR: cptofs failed. diskSize might be too small for closure."; exit 1)
   '';
 
   moveOrConvertImage = ''
@@ -704,7 +727,8 @@ let
 
         mountPoint=/mnt
         mkdir $mountPoint
-        mount $rootDisk $mountPoint
+        # datum-node-image: no delayed allocation, so what the VM writes lands in program order
+        mount ${lib.optionalString (fsType == "ext4" && deterministic) "-o nodelalloc "}$rootDisk $mountPoint
 
         # Create the ESP and mount it. Unlike e2fsprogs, mkfs.vfat doesn't support an
         # '-E offset=X' option, so we can't do this outside the VM.
