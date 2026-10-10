@@ -22,9 +22,10 @@ in
         inherit (config.virtualisation) diskSize;
         inherit config lib pkgs;
         format = "qcow2";
-        # as upstream: the file is gzipped here; flake.nix re-gzips it without name and mtime
+        # upstream gzips here with the file's mtime in the header; -n leaves name and time out,
+        # so this derivation's output is already stable (flake.nix re-gzips once more, harmlessly)
         postVM = ''
-          ${pkgs.gzip}/bin/gzip $diskImage
+          ${pkgs.gzip}/bin/gzip -9 -n $diskImage
         '';
         configFile =
           if config.virtualisation.digitalOceanImage.configFile == null then
