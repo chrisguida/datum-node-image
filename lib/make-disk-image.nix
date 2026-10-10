@@ -400,7 +400,7 @@ let
       fakeroot
       findutils
       sqlite
-      zerofree
+      gawk
       config.system.build.nixos-install
       nixos-enter
       nix
@@ -686,6 +686,52 @@ let
     }
   '';
 
+  # datum-node-image: rebuild the root filesystem from its own contents once the VM is done.
+  # The VM (bootloader install, activation) writes with a real kernel, whose block allocator, journal,
+  # clock and deleted inodes all leave build-specific traces. So: pull the finished tree out with
+  # debugfs (under fakeroot, which records owners and modes), give everything the VM touched one
+  # fixed time, load the Nix database afresh from the closure's registration (nixos-install fills it
+  # in copy order, which varies), and let mke2fs -d lay the whole thing out again. The bootloader
+  # code in the first megabyte finds /boot/grub through the filesystem, by UUID, so it is unaffected.
+  rebuildRootFs = lib.optionalString (fsType == "ext4" && deterministic && !onlyNixStore) ''
+    echo "rebuilding the root filesystem deterministically..."
+    chmod -R u+w $root 2>/dev/null || true
+    rm -rf $root
+    partBytes=$(( $(stat -c %s $diskImage) ))
+    partSkip=0
+    ${lib.optionalString (partitionTableType != "none") ''
+      partSkip=$(sectorsToBytes $START)
+      partBytes=$(sectorsToBytes $SECTORS)
+    ''}
+    dd if=$diskImage of=old.part bs=1M iflag=skip_bytes,count_bytes skip=$partSkip count=$partBytes status=none
+    mkdir tree
+    fakeroot -s fakeroot.state -- sh -ec '
+      debugfs -R "ls -p /" old.part 2>/dev/null | awk -F/ "NF>5 {print \$6}" | while read -r n; do
+        case "$n" in .|..|lost+found|"") continue ;; esac
+        debugfs -R "rdump \"/$n\" tree" old.part >/dev/null 2>rdump.err || { cat rdump.err >&2; exit 1; }
+        if grep -v "^debugfs " rdump.err | grep -q .; then cat rdump.err >&2; exit 1; fi
+      done
+    '
+    rm old.part
+    db=tree/nix/var/nix/db
+    rm -f $db/db.sqlite $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal
+    NIX_STATE_DIR=$PWD/tree/nix/var/nix nix-store --option use-sqlite-wal false --load-db < ${closureInfo}/registration
+    sqlite3 $db/db.sqlite "UPDATE ValidPaths SET registrationTime=1; VACUUM;" >/dev/null
+    rm -f $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal
+    truncate -s $partBytes new.part
+    E2FSPROGS_FAKE_TIME=1 fakeroot -i fakeroot.state -- sh -ec '
+      chown -R 0:0 tree/nix/var/nix
+      find tree -newermt 1990-01-01 -exec touch -h -d @946684800 {} +
+      mkfs.ext4 -b ${blockSize} -F -L ${label} -U ${rootFSUID} -E hash_seed=${rootFSUID} -d tree new.part
+    '
+    for kv in "mkfs_time 0" "mtime 0" "wtime 0" "lastcheck 0" "kbytes_written 0"; do
+      debugfs -w -R "set_super_value $kv" new.part 2>/dev/null
+    done
+    e2fsck -fn new.part
+    dd if=new.part of=$diskImage bs=1M oflag=seek_bytes seek=$partSkip conv=notrunc status=none
+    rm -rf new.part tree fakeroot.state rdump.err
+  '';
+
   moveOrConvertImage = ''
     ${
       if format == "raw" then
@@ -720,7 +766,7 @@ let
           e2fsprogs
           dosfstools
         ];
-        postVM = moveOrConvertImage + createHydraBuildProducts + postVM;
+        postVM = rebuildRootFs + moveOrConvertImage + createHydraBuildProducts + postVM;
         QEMU_OPTS = lib.concatStringsSep " " (
           # datum-node-image: fixed VM clock (bootloader-installed files take their mtime from it)
           lib.optional deterministic "-rtc base=2000-01-01T00:00:00,clock=vm"
@@ -841,12 +887,6 @@ let
           fi
         done
 
-        ${lib.optionalString (fsType == "ext4" && deterministic) ''
-          # datum-node-image: everything created or changed in this VM carries the VM clock (year 2000 plus
-          # however long the steps took); remember those inodes so their times can be fixed below
-          rm -f $mountPoint/nix/var/nix/db/db.sqlite-shm $mountPoint/nix/var/nix/db/db.sqlite-wal
-          find $mountPoint -xdev -newerct '1990-01-01' -printf '%i\n' | sort -n > /vm-inodes
-        ''}
         umount -R /mnt
 
         # Make sure resize2fs works. Note that resize2fs has stricter criteria for resizing than a normal
@@ -855,26 +895,6 @@ let
         # In deterministic mode, this is fixed to 1970-01-01 (UNIX timestamp 0).
         # This two-step approach is necessary otherwise `tune2fs` will want a fresher filesystem to perform
         # some changes.
-        ${lib.optionalString (fsType == "ext4" && deterministic) ''
-          # datum-node-image: one fixed time on every inode the VM touched, deleted inodes wiped, a fresh
-          # (zeroed) journal, and zeros in every free block
-          {
-            while read -r i; do
-              for f in atime ctime mtime crtime; do
-                echo "sif <$i> $f @946684800"
-                echo "sif <$i> ''${f}_extra 0"
-              done
-            done < /vm-inodes
-            dumpe2fs $rootDisk 2>/dev/null | sed -n 's/^  Free inodes: //p' | tr ',' '\n' | tr -d ' ' | while read -r r; do
-              [ -n "$r" ] || continue
-              seq "''${r%-*}" "''${r#*-}"
-            done | sed 's/.*/clri <&>/'
-          } > /scrub.cmds
-          debugfs -w -f /scrub.cmds $rootDisk > /dev/null 2>&1
-          tune2fs -O ^has_journal $rootDisk
-          tune2fs -O has_journal $rootDisk
-          zerofree $rootDisk
-        ''}
         ${lib.optionalString (fsType == "ext4") ''
           tune2fs -T now ${lib.optionalString deterministic "-U ${rootFSUID}"} -c 0 -i 0 $rootDisk
           ${lib.optionalString deterministic "tune2fs -f -T 19700101 $rootDisk"}
@@ -883,7 +903,6 @@ let
             for kv in "mkfs_time 0" "mtime 0" "wtime 0" "kbytes_written 0"; do
               debugfs -w -R "set_super_value $kv" $rootDisk
             done
-            e2fsck -fn $rootDisk
           ''}
         ''}
       ''
