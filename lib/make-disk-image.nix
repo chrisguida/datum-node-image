@@ -718,6 +718,8 @@ let
     NIX_STATE_DIR=$PWD/tree/nix/var/nix nix-store --option use-sqlite-wal false --load-db < ${closureInfo}/registration
     sqlite3 $db/db.sqlite "UPDATE ValidPaths SET registrationTime=1; VACUUM;" >/dev/null
     rm -f $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal
+    # update-users-groups.pl writes /etc/shadow in hash order; the order of its lines means nothing
+    if [ -f tree/etc/shadow ]; then LC_ALL=C sort -o tree/etc/shadow tree/etc/shadow; fi
     truncate -s $partBytes new.part
     E2FSPROGS_FAKE_TIME=1 fakeroot -i fakeroot.state -- sh -ec '
       chown -R 0:0 tree/nix/var/nix
