@@ -6,6 +6,8 @@
 # on first boot and picks systemd-boot or GRUB per variant.
 { lib, ... }:
 {
+  imports = [ ../modules/deterministic-image.nix ];
+
   # The image variants (nixpkgs disk-image module) define the root filesystem
   # and bootloader themselves. These low-priority defaults only make the base
   # configuration evaluable on its own (`nix flake check`); every variant
