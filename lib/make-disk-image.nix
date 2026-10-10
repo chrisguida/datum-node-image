@@ -401,6 +401,7 @@ let
       findutils
       sqlite
       gawk
+      jq
       config.system.build.nixos-install
       nixos-enter
       nix
@@ -720,6 +721,14 @@ let
     rm -f $db/db.sqlite-shm $db/db.sqlite-wal $db/db.sqlite-journal
     # update-users-groups.pl writes /etc/shadow in hash order; the order of its lines means nothing
     if [ -f tree/etc/shadow ]; then LC_ALL=C sort -o tree/etc/shadow tree/etc/shadow; fi
+    # install-grub.pl records its settings in /boot/grub/state, the sixth line a JSON object with
+    # perl's hash order; sorted keys are the same data
+    st=tree/boot/grub/state
+    if [ -f $st ] && [ "$(sed -n 6p $st | cut -c1)" = "{" ]; then
+      { head -n 5 $st; sed -n 6p $st | jq -S -c .; tail -n +7 $st; } > state.tmp
+      cat state.tmp > $st
+      rm state.tmp
+    fi
     truncate -s $partBytes new.part
     E2FSPROGS_FAKE_TIME=1 fakeroot -i fakeroot.state -- sh -ec '
       chown -R 0:0 tree/nix/var/nix
