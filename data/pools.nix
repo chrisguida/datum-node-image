@@ -49,8 +49,13 @@
     pubkey = "dbb11fa0c2b5403e4f798fa6071bb97e6079d219598366032fdf2ae01962b13c5e66e2be7d6b008f0b2603f3e6f6fc64768fa786c8129c46d3e30a5867734b62";
   };
 
-  # Not listed yet, keys still to be obtained from the operators:
-  #   maveth   RIPTIDE, riptide.maveth.ca:29120 (0%); the page says to rely on the
-  #            gateway's key auto-fetch and does not publish the key
-  #   lazarus  AwokenLazarus; site unreachable on 2026-09-30
+  maveth = {
+    name = "RIPTIDE (Maveth)";
+    url = "https://riptide.maveth.ca/connect";
+    # https://riptide.maveth.ca/connect publishes the gateway config JSON (pool_host, pool_port,
+    # pool_pubkey); "soft main" port 29120: 0% fee, min diff 2048, ABW off. Copied 2026-10-10.
+    host = "riptide.maveth.ca";
+    port = 29120;
+    pubkey = "b95abf4a11050c5164d09e9d3c4a18a4df735c5d670e3e974fc146794efa4ed9fbc78e7cd4b6abcd3fcc0e0619543d60004fdb49e9d2974582ae11988a03d743";
+  };
 }

@@ -62,10 +62,14 @@ in
   };
 
   services.blake2b-node.enable = true;
+  # The Knots build: 29.4.2 plus the 976,000 assumeutxo entry (#444), the attested Guix tarball
+  # (pkgs/bitcoind-knots-976000-bin.nix), not a source build. pkgs.bitcoind-knots-bin is the official 29.4.2.
+  services.blake2b-node.knotsPackage = pkgs.bitcoind-knots-976000-bin;
   # assumeutxo fast start: snapshot taken 2026-10-02 from a synced unpruned Knots 29.4.2
-  # (dumptxoutset type=latest); the Knots build carries the chainparams entry until it is upstream
+  # (dumptxoutset type=latest); the build above carries the chainparams entry until it is upstream
   services.blake2b-node.fastStart = {
     enable = true;
+    patchKnots = false;
     height = 976000;
     blockhash = "000000000000000098441aee029573795681eb1602c75271e809b136e9217373";
     utxoHash = "dbd67717d3f108e4fbd8b4f9efc4057cac11a0ba7c23584b43cca42c9edb7118";
