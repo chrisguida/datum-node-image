@@ -59,6 +59,16 @@ in
   services.cloud-init = {
     enable = true;
     network.enable = true;
+    # Without "disk_setup" and "mounts": the image has one root partition that NixOS grows itself, and the
+    # mounts module fails the whole cloud-config unit trying to write the read-only /etc/fstab.
+    settings.cloud_config_modules = [
+      "ssh-import-id"
+      "set-passwords"
+      "timezone"
+      "disable-ec2-metadata"
+      "runcmd"
+      "ssh"
+    ];
   };
 
   services.blake2b-node.enable = true;
