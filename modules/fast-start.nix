@@ -31,6 +31,7 @@ let
         pkgs.aria2
         pkgs.jq
         pkgs.gnugrep
+        pkgs.gnused
         node.knotsRuntimePackage
       ]
     }
