@@ -749,8 +749,10 @@ let
   # running clock, so the directory entries carry creation times that differ by build. Copy the
   # files out, make the FAT filesystem again with a fixed volume id and one fixed time, and put the
   # files back in sorted order. The firmware finds the loader by path and NixOS mounts the
-  # partition by label, so neither depends on what changes here.
-  rebuildEsp = lib.optionalString (deterministic && partitionTableType == "efi") ''
+  # partition by label; GRUB's BIOS boot code (hybrid layout) finds it by volume id, which is
+  # why the VM formats it with the same fixed id.
+  espVolumeId = "2B1AC0DE";
+  rebuildEsp = lib.optionalString (deterministic && (partitionTableType == "efi" || partitionTableType == "hybrid")) ''
     echo "rebuilding the EFI system partition deterministically..."
     eval $(partx $diskImage -o START,SECTORS --nr 1 --pairs)
     espSkip=$(sectorsToBytes $START)
@@ -764,7 +766,14 @@ let
     rm -f esp/loader/random-seed
     truncate -s $espBytes new.esp
     export SOURCE_DATE_EPOCH=946684800
-    TZ=UTC mkfs.vfat --invariant -i 2B1AC0DE -n ESP new.esp >/dev/null
+    TZ=UTC mkfs.vfat --invariant -i ${espVolumeId} -n ESP new.esp >/dev/null
+    # GRUB on the ESP (the hybrid layout): same key-order fix as /boot/grub/state on ext4
+    st=esp/grub/state
+    if [ -f $st ] && [ "$(sed -n 6p $st | cut -c1)" = "{" ]; then
+      { head -n 5 $st; sed -n 6p $st | jq -S -c .; tail -n +7 $st; } > state.tmp
+      cat state.tmp > $st
+      rm state.tmp
+    fi
     find esp -exec touch -h -d @946684800 {} +
     (cd esp && find . -mindepth 1 -type d | LC_ALL=C sort) | while read -r d; do
       TZ=UTC MTOOLS_SKIP_CHECK=1 mmd -i new.esp "::/''${d#./}"
@@ -854,7 +863,7 @@ let
         # '-E offset=X' option, so we can't do this outside the VM.
         ${lib.optionalString (partitionTableType == "efi" || partitionTableType == "hybrid") ''
           mkdir -p /mnt/boot
-          mkfs.vfat -n ESP /dev/vda1
+          mkfs.vfat ${lib.optionalString deterministic "-i ${espVolumeId}"} -n ESP /dev/vda1
           mount /dev/vda1 /mnt/boot
 
           ${lib.optionalString touchEFIVars "mount -t efivarfs efivarfs /sys/firmware/efi/efivars"}

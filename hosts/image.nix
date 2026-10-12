@@ -11,9 +11,31 @@
   # Each variant records its own name (datum-node-image.variant -> /etc/datum-node-image/image.json),
   # so a deployed system knows which image to rebuild when it updates itself. image.modules.<name>
   # is nixpkgs' per-variant module list; these entries merge with its defaults.
-  image.modules = lib.genAttrs [ "digital-ocean" "qemu-efi" "raw-efi" "raw" ] (name: {
-    datum-node-image.variant = name;
-  });
+  image.modules =
+    lib.genAttrs [ "digital-ocean" "qemu-efi" "raw-efi" "raw" ] (name: {
+      datum-node-image.variant = name;
+    })
+    // {
+      # One raw image for any KVM host: a GPT disk with both a BIOS boot partition and an ESP, GRUB
+      # installed for both firmwares (the EFI copy at the removable-media path, since a fresh VM has
+      # no boot entries), cloud-init for the provider's metadata.
+      generic =
+        { modulesPath, ... }:
+        {
+          imports = [ (modulesPath + "/virtualisation/disk-image.nix") ];
+          datum-node-image.variant = "generic";
+          image.format = "raw";
+          image.efiSupport = true;
+          boot.loader.systemd-boot.enable = false;
+          boot.loader.efi.canTouchEfiVariables = false;
+          boot.loader.grub = {
+            enable = true;
+            efiSupport = true;
+            efiInstallAsRemovable = true;
+            devices = [ "/dev/vda" ];
+          };
+        };
+    };
 
   # The image variants (nixpkgs disk-image module) define the root filesystem
   # and bootloader themselves. These low-priority defaults only make the base

@@ -23,6 +23,7 @@ in
 
     variant = lib.mkOption {
       type = lib.types.enum [
+        "generic"
         "digital-ocean"
         "qemu-efi"
         "raw-efi"

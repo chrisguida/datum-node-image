@@ -40,7 +40,13 @@ in
         inherit lib config pkgs;
         inherit (config.virtualisation) diskSize;
         inherit (config.image) baseName format;
-        partitionTableType = if config.image.efiSupport then "efi" else "legacy";
+        partitionTableType =
+          if config.datum-node-image.variant == "generic" then
+            "hybrid"
+          else if config.image.efiSupport then
+            "efi"
+          else
+            "legacy";
       });
     })
   ];
