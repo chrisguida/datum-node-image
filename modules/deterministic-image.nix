@@ -41,7 +41,7 @@ in
         inherit (config.virtualisation) diskSize;
         inherit (config.image) baseName format;
         partitionTableType =
-          if config.datum-node-image.variant == "generic" then
+          if lib.hasPrefix "generic" config.datum-node-image.variant then
             "hybrid"
           else if config.image.efiSupport then
             "efi"

@@ -1,10 +1,32 @@
 # Host variant built as a disk image via system.build.images.<variant>:
-#   qemu-efi  -> qcow2, UEFI      (LunaNode, DigitalOcean if UEFI, local QEMU)
-#   raw-efi   -> raw,   UEFI      (Vultr)
-#   raw       -> raw,   BIOS/GRUB (DigitalOcean, older hypervisors)
+#   generic       -> raw,   BIOS and UEFI (any KVM provider that imports raw disks: DigitalOcean, Vultr)
+#   generic-qcow2 -> qcow2, BIOS and UEFI (providers that import qcow2 only: LunaNode; local QEMU)
+#   qemu-efi      -> qcow2, UEFI only, systemd-boot
+#   raw-efi       -> raw,   UEFI only, systemd-boot
+#   raw           -> raw,   BIOS only, GRUB
+#   digital-ocean -> qcow2, BIOS only, GRUB, DigitalOcean metadata services instead of cloud-init
 # The nixpkgs disk-image module defines "/" by label, grows the root partition
 # on first boot and picks systemd-boot or GRUB per variant.
 { lib, ... }:
+let
+  genericImage =
+    variant: format:
+    { modulesPath, ... }:
+    {
+      imports = [ (modulesPath + "/virtualisation/disk-image.nix") ];
+      datum-node-image.variant = variant;
+      image.format = format;
+      image.efiSupport = true;
+      boot.loader.systemd-boot.enable = false;
+      boot.loader.efi.canTouchEfiVariables = false;
+      boot.loader.grub = {
+        enable = true;
+        efiSupport = true;
+        efiInstallAsRemovable = true;
+        devices = [ "/dev/vda" ];
+      };
+    };
+in
 {
   imports = [ ../modules/deterministic-image.nix ];
 
@@ -16,25 +38,12 @@
       datum-node-image.variant = name;
     })
     // {
-      # One raw image for any KVM host: a GPT disk with both a BIOS boot partition and an ESP, GRUB
+      # One image for any KVM host: a GPT disk with both a BIOS boot partition and an ESP, GRUB
       # installed for both firmwares (the EFI copy at the removable-media path, since a fresh VM has
-      # no boot entries), cloud-init for the provider's metadata.
-      generic =
-        { modulesPath, ... }:
-        {
-          imports = [ (modulesPath + "/virtualisation/disk-image.nix") ];
-          datum-node-image.variant = "generic";
-          image.format = "raw";
-          image.efiSupport = true;
-          boot.loader.systemd-boot.enable = false;
-          boot.loader.efi.canTouchEfiVariables = false;
-          boot.loader.grub = {
-            enable = true;
-            efiSupport = true;
-            efiInstallAsRemovable = true;
-            devices = [ "/dev/vda" ];
-          };
-        };
+      # no boot entries), cloud-init for the provider's metadata. Raw for providers that import raw
+      # disks (DigitalOcean, Vultr), qcow2 for those that take only qcow2 (LunaNode).
+      generic = genericImage "generic" "raw";
+      generic-qcow2 = genericImage "generic-qcow2" "qcow2";
     };
 
   # The image variants (nixpkgs disk-image module) define the root filesystem
@@ -54,6 +63,7 @@
     "virtio_scsi"
     "virtio_net"
     "ahci"
+    "ata_piix"
     "sd_mod"
     "sr_mod"
     "nvme"

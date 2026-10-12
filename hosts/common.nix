@@ -59,6 +59,17 @@ in
   services.cloud-init = {
     enable = true;
     network.enable = true;
+    # The providers this image is imported on, config drive first: DigitalOcean's custom-image
+    # notes say a droplet made from an image that tries NoCloud before ConfigDrive does not come up
+    # right. cloud-init's own default order has NoCloud first.
+    settings.datasource_list = [
+      "ConfigDrive"
+      "DigitalOcean"
+      "Vultr"
+      "OpenStack"
+      "NoCloud"
+      "None"
+    ];
     # Without "disk_setup" and "mounts": the image has one root partition that NixOS grows itself, and the
     # mounts module fails the whole cloud-config unit trying to write the read-only /etc/fstab.
     settings.cloud_config_modules = [

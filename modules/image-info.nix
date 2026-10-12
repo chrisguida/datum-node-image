@@ -24,6 +24,7 @@ in
     variant = lib.mkOption {
       type = lib.types.enum [
         "generic"
+        "generic-qcow2"
         "digital-ocean"
         "qemu-efi"
         "raw-efi"
