@@ -759,6 +759,9 @@ let
     mkdir esp
     MTOOLS_SKIP_CHECK=1 mcopy -s -n -i old.esp ::/ esp/
     rm old.esp
+    # bootctl install leaves 32 random bytes here. A seed that every copy of a published image
+    # shares is worth nothing; systemd writes a fresh one on the first boot.
+    rm -f esp/loader/random-seed
     truncate -s $espBytes new.esp
     export SOURCE_DATE_EPOCH=946684800
     TZ=UTC mkfs.vfat --invariant -i 2B1AC0DE -n ESP new.esp >/dev/null
