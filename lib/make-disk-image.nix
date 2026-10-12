@@ -400,6 +400,8 @@ let
       fakeroot
       findutils
       sqlite
+      mtools
+      dosfstools
       gawk
       jq
       config.system.build.nixos-install
@@ -743,6 +745,36 @@ let
     rm -rf new.part tree fakeroot.state rdump.err
   '';
 
+  # datum-node-image: the same for the EFI system partition. The VM formats and fills it with a
+  # running clock, so the directory entries carry creation times that differ by build. Copy the
+  # files out, make the FAT filesystem again with a fixed volume id and one fixed time, and put the
+  # files back in sorted order. The firmware finds the loader by path and NixOS mounts the
+  # partition by label, so neither depends on what changes here.
+  rebuildEsp = lib.optionalString (deterministic && partitionTableType == "efi") ''
+    echo "rebuilding the EFI system partition deterministically..."
+    eval $(partx $diskImage -o START,SECTORS --nr 1 --pairs)
+    espSkip=$(sectorsToBytes $START)
+    espBytes=$(sectorsToBytes $SECTORS)
+    dd if=$diskImage of=old.esp bs=1M iflag=skip_bytes,count_bytes skip=$espSkip count=$espBytes status=none
+    mkdir esp
+    MTOOLS_SKIP_CHECK=1 mcopy -s -n -i old.esp ::/ esp/
+    rm old.esp
+    truncate -s $espBytes new.esp
+    export SOURCE_DATE_EPOCH=946684800
+    TZ=UTC mkfs.vfat --invariant -i 2B1AC0DE -n ESP new.esp >/dev/null
+    find esp -exec touch -h -d @946684800 {} +
+    (cd esp && find . -mindepth 1 -type d | LC_ALL=C sort) | while read -r d; do
+      TZ=UTC MTOOLS_SKIP_CHECK=1 mmd -i new.esp "::/''${d#./}"
+    done
+    (cd esp && find . -type f | LC_ALL=C sort) | while read -r f; do
+      TZ=UTC MTOOLS_SKIP_CHECK=1 mcopy -m -i new.esp "esp/''${f#./}" "::/''${f#./}"
+    done
+    fsck.vfat -n new.esp >/dev/null
+    dd if=new.esp of=$diskImage bs=1M oflag=seek_bytes seek=$espSkip conv=notrunc status=none
+    rm -rf new.esp esp
+    unset SOURCE_DATE_EPOCH
+  '';
+
   moveOrConvertImage = ''
     ${
       if format == "raw" then
@@ -777,7 +809,7 @@ let
           e2fsprogs
           dosfstools
         ];
-        postVM = rebuildRootFs + moveOrConvertImage + createHydraBuildProducts + postVM;
+        postVM = rebuildRootFs + rebuildEsp + moveOrConvertImage + createHydraBuildProducts + postVM;
         QEMU_OPTS = lib.concatStringsSep " " (
           # datum-node-image: fixed VM clock (bootloader-installed files take their mtime from it)
           lib.optional deterministic "-rtc base=2000-01-01T00:00:00,clock=vm"
