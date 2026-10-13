@@ -64,6 +64,9 @@
           for f in ${drv}/*.qcow2.gz; do
             gunzip -c "$f" | gzip -9 -n > "$out/$(basename "$f")"
           done
+          for f in ${drv}/*.img; do
+            gzip -9 -n -c "$f" > "$out/$(basename "$f").gz"
+          done
           cp -r ${drv}/nix-support $out/ 2>/dev/null || true
         '';
     in
@@ -108,6 +111,12 @@
         }
         // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
           inherit (pkgs) bitcoind-knots-976000-bin;
+          # the generic image boots from BIOS and UEFI on any provider; the raw .img and its
+          # gzip for URL imports (Vultr) and DigitalOcean, the qcow2 for LunaNode
+          image-generic = images.generic;
+          image-generic-gz = deterministicGzip pkgs images.generic;
+          image-generic-qcow2 = images.generic-qcow2;
+          # provider-specific variants from before the generic image
           image-qcow2 = images.qemu-efi;
           image-raw-efi = images.raw-efi;
           image-raw-bios = images.raw;

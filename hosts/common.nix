@@ -70,6 +70,14 @@ in
       "NoCloud"
       "None"
     ];
+    # No vendor data: DigitalOcean's vendor scripts (VPC peering routes, the DO agent, a machine-id
+    # reset) are written for Ubuntu and fail the cloud-final unit on NixOS; the SSH keys and hostname
+    # come from the metadata, not from vendor data.
+    settings.vendor_data.enabled = false;
+    settings.cloud_final_modules = [
+      "scripts-user"
+      "final-message"
+    ];
     # Without "disk_setup" and "mounts": the image has one root partition that NixOS grows itself, and the
     # mounts module fails the whole cloud-config unit trying to write the read-only /etc/fstab.
     settings.cloud_config_modules = [
