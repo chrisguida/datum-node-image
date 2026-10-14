@@ -32,14 +32,18 @@ pool and a node name, then shows sync and mining status. No terminal needed.
 # packages
 nix build .#bitcoind-knots-bin .#datum-gateway-convoy .#datum-gateway-iohzrd .#ratum-gateway
 
-# disk images (x86_64)
-nix build .#image-qcow2      # qemu-efi: qcow2, UEFI  (LunaNode, local QEMU)
-nix build .#image-raw-efi    # raw, UEFI              (Vultr)
-nix build .#image-raw-bios   # raw, BIOS/GRUB         (DigitalOcean, older hypervisors)
+# the generic image: one image that boots from BIOS and UEFI on every provider tested
+nix build .#image-generic        # raw .img        (Vultr and other URL imports, in-place installs)
+nix build .#image-generic-gz     # the same, gzip  (DigitalOcean, downloads)
+nix build .#image-generic-qcow2  # qcow2           (LunaNode, local QEMU)
+
+# the provider-specific variants from before the generic image; still build, still reproduce
+nix build .#image-qcow2 .#image-raw-efi .#image-raw-bios .#image-digitalocean
 ```
 
-The image is a few GB, sized to its contents; the root partition grows to the
-VPS disk on first boot.
+The raw image is 5.4 GB with most of it zeros (767 MB gzipped), sized to its
+contents; the root partition grows to the VPS disk on first boot. Releases ship
+the three generic files with signed hashes; see `docs/releasing.md`.
 
 ## Test locally
 
@@ -60,10 +64,11 @@ The image boots to SSH in about 15 seconds. Stop it with `kill $(cat /tmp/vm/qem
 
 ## Deploy
 
-**Image import (Vultr, LunaNode, DigitalOcean, Linode, ...):** upload the raw or
-qcow2 file (or its URL) as a snapshot/custom image, deploy a server from it
-with at least 4 GB RAM and 80 GB disk. cloud-init takes the SSH key and
-hostname from the provider.
+**Image import (DigitalOcean, Vultr, LunaNode, Linode, ...):** upload the raw,
+gzip or qcow2 file (or its URL) as a snapshot/custom image, deploy a server from
+it with at least 4 GB RAM and 80 GB disk. cloud-init takes the SSH key and
+hostname from the provider. Step by step for DigitalOcean (import, or in place
+over an existing droplet), Vultr and LunaNode: [`docs/install.md`](docs/install.md).
 
 **Rescue mode (Hetzner, OVH, Scaleway, ...):** put your SSH public key in
 `hosts/authorized-keys.nix`, boot the server into the provider's rescue
@@ -275,17 +280,21 @@ services.blake2b-node = {
 ## Reproducibility
 
 Every input is pinned: nixpkgs by `flake.lock`, the node by the release
-tarball's SHA256, the gateways by commit hash or release-asset SHA256. To
-check that two machines agree:
+tarball's SHA256, the gateways by commit hash or release-asset SHA256. The disk
+image is bit-for-bit reproducible: the generic image at d04e22d was built three
+times on two machines (Debian 13 with Nix 2.25.3, Ubuntu 26.04 with Nix 2.35.2)
+with the same hash. How it is done is in `docs/releasing.md` ("Why it
+reproduces") and `lib/make-disk-image.nix`. To check a release yourself:
 
 ```sh
-nix build .#image-raw-efi --rebuild --keep-failed   # rebuilds and compares to the store copy
-sha256sum result/*.img
+git verify-tag <tag> && git checkout <tag>
+nix build .#image-generic && sha256sum result/*.img   # must match the release's SHA256SUMS
 ```
 
-Bit-for-bit reproducibility of the disk image itself is designed in by the
-nixpkgs image builder but is not proven until two independent runners produce
-the same hash; that is phase 4.
+If your hash differs, nothing is lost and the image is not necessarily bad: it
+is a reproducibility bug and this project wants to hear about it. Open an issue
+with your hash, `nix --version`, your OS and CPU. If it matches, attest: see
+`attestations/README.md`.
 
 ## Known issues and caveats (2026-10-05)
 
