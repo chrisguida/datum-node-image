@@ -110,11 +110,19 @@ Source: [LunaNode images](https://www.lunanode.com/features/images),
 
 ## After the first boot
 
-The same checks on every provider. On a 2 vCPU / 4 GB machine the UTXO snapshot is loaded
-about 20 minutes after power-on. The node then has to sync every block mined since the
-snapshot before the gateway hands out its first job, and it does that at roughly 16 blocks a
-minute while background validation runs alongside: with the 976,000 snapshot (October 7)
-count on about an hour more per week of snapshot age.
+The same checks on every provider. Power-on to usable on a 2 vCPU / 4 GB machine, measured
+on DigitalOcean:
+
+| Milestone | After power-on | Note |
+| --- | --- | --- |
+| Setup page and SSH answer | under 1 minute | |
+| Snapshot downloaded and loaded (node at height 976,000) | 20 minutes | measured twice |
+| First stratum job (mining) | 69 minutes on 2026-10-13 | the node first syncs every block mined since the snapshot (2026-10-07), at 15 to 20 blocks a minute while background validation runs alongside |
+| Same, later | about 10 minutes more per day of snapshot age | the chain adds about 180 blocks a day; around 2 hours on Oct 20, 3.5 to 4 hours on Oct 30 |
+
+A snapshot at a newer height would cut the catch-up; it needs its own Knots chainparams
+entry, so it moves at Knots release cadence. Everything but mining works from the first
+minute.
 
 1. **Setup page.** `https://<IP>/` redirects to `/setup` and asks for the setup code, a
    password, a payout address and a pool. After the form it goes to `/status`.
