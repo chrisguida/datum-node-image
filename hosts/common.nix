@@ -88,6 +88,11 @@ in
       "runcmd"
       "ssh"
     ];
+    # Host keys are NixOS's job (sshd-keygen.service). cloud-init's ssh module would generate the
+    # same files in the same second, and whichever ssh-keygen loses the race fails its unit on
+    # "already exists"; the image ships no host keys, so there is nothing for it to delete either.
+    settings.ssh_deletekeys = false;
+    settings.ssh_genkeytypes = [ ];
   };
 
   services.blake2b-node.enable = true;
