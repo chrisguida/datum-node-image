@@ -3,7 +3,7 @@
 #   convoy  - CONVOYMining/datum_gateway master (carries the BLAKE2b fixes first)
 #   iohzrd  - iohzrd/datum_gateway at the commit some pools pin (AlphaPool)
 #
-# Both are OCEAN's datum_gateway 0.4.1 plus each build's changes; same config schema.
+# convoy is at its v0.5.0-beta; iohzrd is OCEAN's datum_gateway 0.4.1 plus its changes. Same config schema.
 {
   lib,
   stdenv,
@@ -20,15 +20,15 @@ let
   variants = {
     convoy = {
       owner = "CONVOYMining";
-      rev = "ac9b70c8b361f14e90e2c963b429a9bbb414aecb"; # master, 2026-09-26 "conf: Drop default vardiff_min to 1024"
-      hash = "sha256-rStCvdFGduz1Jy4Tu+lsJMtE3p/ZesIvRcFOwVL9BIk=";
-      version = "0.4.1-convoy-20260926";
+      rev = "69c61a95cb941c35138c30b8d738e789ad8cdac1"; # master, 2026-10-10 "Bump version to v0.5.0-beta"
+      hash = "sha256-y2A0W3Wh57S7sBPEjb6+GOIiYHMmO7r3ztTwa/5Trk4=";
+      version = "0.5.0-beta-convoy-20261010";
     };
     iohzrd = {
       owner = "iohzrd";
-      rev = "7491a5099dd5d887a027c812f71de63e0d5986a3"; # 2026-09-05, BLAKE2b coinbase weight-limit fix
-      hash = "sha256-psc7LogLcqUREvLAI6jrAFSXv172dC9UIS0k0okGB28=";
-      version = "0.4.1-iohzrd-20260905";
+      rev = "76d748e8ba2069879e356b3d8b38b8785192f816"; # 2026-10-05, 164-byte BLAKE2b header in the coinbase weight limit, sigop limit on coinbaser outputs
+      hash = "sha256-omlHZJLb8GgwQze2GYoSvTLSVwWQYe9Y8YWbzIlXtDo=";
+      version = "0.4.1-iohzrd-20261005";
     };
   };
   v = variants.${variant} or (throw "datum-gateway: unknown variant ${variant}");

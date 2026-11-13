@@ -6,15 +6,15 @@
   fetchurl,
 }:
 let
-  version = "0.1.57";
+  version = "0.1.74";
   perSystem = {
     x86_64-linux = {
       arch = "x86_64";
-      sha256 = "64aaf929b2071530a0263a6b0d5b85d347dc6f48543c96706f8a315408818b23";
+      sha256 = "e55e92502fba17923023dd9550c8fa601d1680b4fc233035465765587eb71c15";
     };
     aarch64-linux = {
       arch = "aarch64";
-      sha256 = "83487458bad0fd8e2bc10dac8b8474816165b5839093cf57d434c6d08cf4830b";
+      sha256 = "281b3b111ac6958530cad507fb3b6ef6d61621bf68225778a1d6c4d776d45d98";
     };
   };
   s =
