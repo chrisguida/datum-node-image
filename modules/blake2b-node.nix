@@ -264,10 +264,19 @@ in
       builds = buildInfo;
     };
 
-    # the wrapper records the running build in /run/bitcoind-blake2b/knots-build
-    systemd.services."bitcoind-${inst}".serviceConfig = {
-      RuntimeDirectory = "bitcoind-${inst}";
-      RuntimeDirectoryMode = "0755";
+    # The wrapper records the running build in /run/bitcoind-blake2b/knots-build. With a single build
+    # there is no wrapper, and without that file the setup page reports "the node is not running",
+    # so the name is recorded before the start instead.
+    systemd.services."bitcoind-${inst}" = {
+      serviceConfig = {
+        RuntimeDirectory = "bitcoind-${inst}";
+        RuntimeDirectoryMode = "0755";
+      };
+      preStart = lib.mkIf (builtins.length (builtins.attrNames builds) == 1) (
+        lib.mkAfter ''
+          printf '%s\n' ${lib.escapeShellArg cfg.knotsBuildDefault} > /run/bitcoind-${inst}/knots-build
+        ''
+      );
     };
 
     services.bitcoind.${inst} = {
@@ -303,7 +312,9 @@ in
         stratum = {
           listen_addr = "0.0.0.0";
           listen_port = cfg.stratumPort;
-          vardiff_min = 16384;
+          # the same floor in both spellings: CONVOY's 0.5.0 takes a difficulty string and warns
+          # about the bare number, the 0.4.1-based builds and ratum-gateway take the number
+          vardiff_min = if cfg.gateway == "convoy" then "70.4T" else 16384;
         };
         api = {
           listen_addr = "127.0.0.1";
