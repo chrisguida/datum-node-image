@@ -16,7 +16,7 @@ pool and a node name, then shows sync and mining status. No terminal needed.
 
 | Piece | Choice | Where |
 |---|---|---|
-| Node | Bitcoin Knots 29.4.2.knots20260508, two attested Guix tarballs bundled: the official one from bitcoinknots.org and the same release plus the 976,000 assumeutxo entry (runs by default); switchable at runtime from the setup page | `pkgs/bitcoind-knots-bin.nix`, `pkgs/bitcoind-knots-976000-bin.nix` |
+| Node | Bitcoin Knots 29.5.knots20260508, the official Guix-built release tarball from bitcoinknots.org (hash from its signed `SHA256SUMS`); it carries the 976,000 assumeutxo entry the fast start needs | `pkgs/bitcoind-knots-bin.nix` |
 | Gateway | CONVOY's `datum_gateway` (default); iohzrd's build and the static `ratum-gateway` are packaged and selectable | `pkgs/datum-gateway.nix`, `pkgs/ratum-gateway.nix` |
 | Pool | OmegaPool (default), Paperclip, Lazarus, CONVOY from `data/pools.nix`, public key pinned; solo or a custom pool from the setup page | `data/pools.nix` |
 | Node settings | prune 10000, dbcache 1024, `blockmaxweight=785000`, block notifications by HTTP to the gateway, RPC cookie group-readable | `modules/blake2b-node.nix` |
@@ -161,25 +161,26 @@ are given for people who prefer one.
 
 ### Switching the Knots build
 
-The image bundles more than one Bitcoin Knots build
-(`services.blake2b-node.knotsBuilds`); today these two, both attested Guix
-tarballs:
+The image can bundle more than one Bitcoin Knots build
+(`services.blake2b-node.knotsBuilds`). This release bundles one:
 
 | Name | What | Snapshot heights it knows |
 |---|---|---|
-| `assumeutxo-976000` (default) | 29.4.2 plus the 976,000 assumeutxo entry ([bitcoinknots/bitcoin#444](https://github.com/bitcoinknots/bitcoin/pull/444)) | 840000, 880000, 910000, 976000 |
-| `official` | the unmodified 29.4.2 release from bitcoinknots.org | 840000, 880000, 910000 |
+| `official` (default) | the 29.5 release from bitcoinknots.org | 840000, 880000, 910000, 976000 |
 
-`bitcoind` is a small wrapper: at every start it reads
-`/var/lib/datum-wizard/knots-build` (one line, a build name; missing or
-unknown means the default) and runs that build. The Update page shows which
-build runs, which one the next start would use, and a **Switch** button per
-other build; switching writes the selector and restarts
-`bitcoind-blake2b.service` (the gateway pauses for a few minutes). By hand:
+The October images ran `assumeutxo-976000`, 29.4.2 plus the 976,000 entry
+([bitcoinknots/bitcoin#444](https://github.com/bitcoinknots/bitcoin/pull/444)).
+29.5 has that entry, and 29.4.2 must not run past block 979,919 (29.4.3
+extended the long coinbase maturity softfork), so that build is gone. A node
+updated from an October image runs `official` whatever its selector file says.
 
-```sh
-echo official > /var/lib/datum-wizard/knots-build && systemctl restart bitcoind-blake2b
-```
+When there is more than one build, `bitcoind` is a small wrapper: at every
+start it reads `/var/lib/datum-wizard/knots-build` (one line, a build name;
+missing or unknown means the default) and runs that build. The Update page
+shows which build runs, which one the next start would use, and a **Switch**
+button per other build; switching writes the selector and restarts
+`bitcoind-blake2b.service` (the gateway pauses for a few minutes). With one
+build there is no wrapper and no button.
 
 **The guard.** A node that started from a UTXO snapshot keeps a second
 ("snapshot") chainstate until the full history has been validated in the
@@ -304,14 +305,6 @@ with your hash, `nix --version`, your OS and CPU. If it matches, attest: see
   (a torrent with an HTTP web seed, or object storage) is next. In the one
   real VPS test so far the file was pushed to the server directly and the
   rest of the fast start took 44 minutes from power-on to a mining-ready node.
-- **The default Knots build is not an official release.** `loadtxoutset` only
-  accepts snapshots whose hash is compiled into Knots, so the build that runs
-  by default is 29.4.2 plus one chainparams commit
-  ([bitcoinknots/bitcoin#444](https://github.com/bitcoinknots/bitcoin/pull/444)),
-  a Guix build with two attestations rather than a source build. The official
-  29.4.2 is bundled too and can be switched to from the setup page once the
-  snapshot's background validation is done (see Updating); when a Knots
-  release carries the entry, it replaces both.
 - **The image is not yet bit-for-bit reproducible.** Two builds differ because
   nixpkgs' image builder leaves the ext4 directory hash seed random and writes
   build-time timestamps into the boot partition. Fixes are identified, not

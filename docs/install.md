@@ -52,7 +52,7 @@ disk is lost. About 5 minutes.
    `-o StrictHostKeyChecking=no`.
 3. Clear the old partition table's backup copy at the end of the disk, then write the image
    and read it back (the byte count is the raw image's size from `SHA256SUMS`' file list;
-   for v2026.11.1-rc1 it is 5513412608):
+   for v2026.11.1-rc2 it is 5474615296):
 
        ssh root@<IP> 'S=$(blockdev --getsz /dev/vda); dd if=/dev/zero of=/dev/vda bs=512 seek=$((S-4096)) count=4096 status=none'
        zcat datum-node-image-generic-<commit>.img.gz | ssh root@<IP> 'dd of=/dev/vda bs=4M conv=fsync status=none; head -c <raw size> /dev/vda | sha256sum'
@@ -137,9 +137,8 @@ minute.
    has caught up to the chain tip; that is expected. The stratum port (23334) opens with
    the first job.
 5. **Update page.** `/update` shows *Built from (git revision)* equal to the release's
-   commit, *Image variant* `generic` or `generic-qcow2`, and *Running* `assumeutxo-976000`.
-   While the node is in background validation the *Switch to official* button is greyed
-   out; that is correct.
+   commit, *Image variant* `generic` or `generic-qcow2`, and *Running* `official`
+   (Bitcoin Knots 29.5). There is one Knots build in this release, so no *Switch* button.
 
 If something on this list fails on your provider, open an issue with the provider, the
 step, and what the console showed.

@@ -1,9 +1,20 @@
 # Changelog
 
+## v2026.11.1-rc2 (2026-11-12)
+
+rc1 was tagged but never published: it still ran Knots 29.4.2.
+
+- Bitcoin Knots 29.5, the official release tarball, is the only bundled build. 29.4.2 does not
+  enforce the long coinbase maturity softfork as extended in 29.4.3 and must not run past block
+  979,919. 29.5 carries the 976,000 assumeutxo entry, so the 29.4.2 + #444 build is gone; a node
+  updated from an October image falls back to `official`.
+- DATUM gateway: CONVOY v0.5.0-beta (2026-10-10); the iohzrd build at its 2026-10-05 head;
+  ratum-gateway 0.1.74.
+
 ## v2026.11.1-rc1 (2026-11-12)
 
-First release candidate. It replaces the unpublished v2026.10.1-rc1 draft, whose image carried a
-kernel open to CVE-2026-98432.
+First release candidate (not published). It replaces the unpublished v2026.10.1-rc1 draft, whose
+image carried a kernel open to CVE-2026-98432.
 
 - Kernel 6.18.63 (nixpkgs 2026-11-11). CVE-2026-98432, remote root through IPv4 options on a TCP
   SYN, is fixed from 6.18.56; the October images ran 6.18.54.
