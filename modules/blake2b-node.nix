@@ -130,12 +130,9 @@ in
         else
           {
             official = pkgs.bitcoind-knots-bin;
-          }
-          // lib.optionalAttrs isX86 {
-            assumeutxo-976000 = pkgs.bitcoind-knots-976000-bin;
           };
       defaultText = lib.literalExpression ''
-        { official = pkgs.bitcoind-knots-bin; assumeutxo-976000 = pkgs.bitcoind-knots-976000-bin; }  # x86_64
+        { official = pkgs.bitcoind-knots-bin; }
       '';
       description = ''
         Bitcoin Knots builds bundled in the image, by name. All of them are in the system closure; the one
@@ -150,11 +147,9 @@ in
       default =
         if cfg.knotsPackage != null then
           lib.getName cfg.knotsPackage
-        else if isX86 then
-          "assumeutxo-976000"
         else
           "official";
-      defaultText = lib.literalExpression ''"assumeutxo-976000"'';
+      defaultText = lib.literalExpression ''"official"'';
       description = "Name in `knotsBuilds` that runs when the selector file is missing or names an unknown build.";
     };
 

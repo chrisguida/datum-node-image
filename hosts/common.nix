@@ -96,13 +96,13 @@ in
   };
 
   services.blake2b-node.enable = true;
-  # Two attested Guix tarballs are bundled (services.blake2b-node.knotsBuilds): "assumeutxo-976000", 29.4.2
-  # plus the 976,000 assumeutxo entry (#444, pkgs/bitcoind-knots-976000-bin.nix), runs by default;
-  # "official" is the unmodified 29.4.2 (pkgs/bitcoind-knots-bin.nix). The setup page switches between
-  # them at runtime through /var/lib/datum-wizard/knots-build; no source build.
-  services.blake2b-node.knotsBuildDefault = "assumeutxo-976000";
+  # One Knots build is bundled (services.blake2b-node.knotsBuilds): "official", the 29.5 release tarball
+  # from bitcoinknots.org (pkgs/bitcoind-knots-bin.nix), no source build. 29.5 carries the 976,000
+  # assumeutxo entry, so the 29.4.2 + #444 build of the October images is gone; 29.4.2 must not run
+  # past block 979,919 (the long coinbase maturity softfork was extended in 29.4.3). A selector file
+  # left by an October image names a build that no longer exists and falls back to this one.
   # assumeutxo fast start: snapshot taken 2026-10-02 from a synced unpruned Knots 29.4.2
-  # (dumptxoutset type=latest); the build above carries the chainparams entry until it is upstream
+  # (dumptxoutset type=latest)
   services.blake2b-node.fastStart = {
     enable = true;
     patchKnots = false;

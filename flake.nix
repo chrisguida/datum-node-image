@@ -24,7 +24,6 @@
 
       overlay = final: prev: {
         bitcoind-knots-bin = final.callPackage ./pkgs/bitcoind-knots-bin.nix { };
-        bitcoind-knots-976000-bin = final.callPackage ./pkgs/bitcoind-knots-976000-bin.nix { };
         datum-gateway-convoy = final.callPackage ./pkgs/datum-gateway.nix { variant = "convoy"; };
         datum-gateway-iohzrd = final.callPackage ./pkgs/datum-gateway.nix { variant = "iohzrd"; };
         ratum-gateway = final.callPackage ./pkgs/ratum-gateway.nix { };
@@ -110,7 +109,6 @@
             ;
         }
         // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          inherit (pkgs) bitcoind-knots-976000-bin;
           # the generic image boots from BIOS and UEFI on any provider; the raw .img and its
           # gzip for URL imports (Vultr) and DigitalOcean, the qcow2 for LunaNode
           image-generic = images.generic;
@@ -134,9 +132,6 @@
             ratum-gateway
             node-wizard
             ;
-        }
-        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          inherit (self.packages.${system}) bitcoind-knots-976000-bin;
         }
       );
     };
