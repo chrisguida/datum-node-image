@@ -116,9 +116,9 @@ on DigitalOcean:
 | Milestone | After power-on | Note |
 | --- | --- | --- |
 | Setup page and SSH answer | under 1 minute | |
-| Snapshot downloaded and loaded (node at height 976,000) | 20 minutes | measured twice |
-| First stratum job (mining) | 69 minutes on 2026-10-13 | the node first syncs every block mined since the snapshot (2026-10-07), at 15 to 20 blocks a minute while background validation runs alongside |
-| Same, later | about 10 minutes more per day of snapshot age | the chain adds about 180 blocks a day; around 2 hours on Oct 20, 3.5 to 4 hours on Oct 30 |
+| Snapshot downloaded and loaded (node at height 976,000) | 20 minutes | measured three times |
+| Caught up to the chain tip, first stratum job (mining) | 69 minutes on 2026-10-13; 6 hours 41 minutes on 2026-11-13 | the node first syncs every block mined since the snapshot (2026-10-07), at 15 to 20 blocks a minute while background validation runs alongside; 5,830 blocks on 2026-11-13 |
+| Same, later | about 10 minutes more per day of snapshot age | the chain adds about 180 blocks a day |
 
 A snapshot at a newer height would cut the catch-up; it needs its own Knots chainparams
 entry, so it moves at Knots release cadence. Everything but mining works from the first
@@ -135,7 +135,9 @@ minute.
    minutes), then the load (15 to 20 minutes), then the gateway starting. The gateway logs
    "Could not fetch new template" and "Did not see an initial stratum job" until the node
    has caught up to the chain tip; that is expected. The stratum port (23334) opens with
-   the first job.
+   the first job. During the days of background validation `/status` sometimes shows "The
+   node is busy (it is loading the snapshot)" with zeros, and `/update` "The node is not
+   reachable": the node took more than 5 seconds to answer. Refresh the page.
 5. **Update page.** `/update` shows *Built from (git revision)* equal to the release's
    commit, *Image variant* `generic` or `generic-qcow2`, and *Running* `official`
    (Bitcoin Knots 29.5). There is one Knots build in this release, so no *Switch* button.
