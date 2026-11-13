@@ -52,7 +52,7 @@ disk is lost. About 5 minutes.
    `-o StrictHostKeyChecking=no`.
 3. Clear the old partition table's backup copy at the end of the disk, then write the image
    and read it back (the byte count is the raw image's size from `SHA256SUMS`' file list;
-   for v2026.11.1-rc2 it is 5474615296):
+   for v2026.11.1-rc3 it is 5474615296):
 
        ssh root@<IP> 'S=$(blockdev --getsz /dev/vda); dd if=/dev/zero of=/dev/vda bs=512 seek=$((S-4096)) count=4096 status=none'
        zcat datum-node-image-generic-<commit>.img.gz | ssh root@<IP> 'dd of=/dev/vda bs=4M conv=fsync status=none; head -c <raw size> /dev/vda | sha256sum'

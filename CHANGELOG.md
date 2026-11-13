@@ -1,8 +1,17 @@
 # Changelog
 
+## v2026.11.1-rc3 (2026-11-13)
+
+rc2 was tested on a DigitalOcean droplet and not published: two things showed there.
+
+- The Update page said "the node is not running" while it ran. With a single Knots build there is
+  no wrapper to record the running build; the service records it now.
+- The CONVOY gateway warned about `stratum.vardiff_min`; it now gets the value as a difficulty
+  string ("70.4T", the same floor). The other gateway builds keep the number.
+
 ## v2026.11.1-rc2 (2026-11-12)
 
-rc1 was tagged but never published: it still ran Knots 29.4.2.
+Not published. rc1 was tagged but never published either: it still ran Knots 29.4.2.
 
 - Bitcoin Knots 29.5, the official release tarball, is the only bundled build. 29.4.2 does not
   enforce the long coinbase maturity softfork as extended in 29.4.3 and must not run past block
