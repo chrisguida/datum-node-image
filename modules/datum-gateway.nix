@@ -32,7 +32,7 @@ let
     }
     umask 077
     if [ ! -s ${stateDir}/admin-password ]; then
-      tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24 > ${stateDir}/admin-password
+      od -An -N18 -tx1 /dev/urandom | tr -d ' \n' > ${stateDir}/admin-password
     fi
     admin=$(cat ${stateDir}/admin-password)
     runtime='{}'
