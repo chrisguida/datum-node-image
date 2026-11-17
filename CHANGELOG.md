@@ -1,5 +1,19 @@
 # Changelog
 
+## v2026.11.1-rc4 (2026-11-16)
+
+Fixes for what the rc3 test on DigitalOcean showed, before rc3 was announced.
+
+- The status and update pages no longer say "loading the snapshot" or "not reachable" when the
+  node is only slow. While it validates old blocks in the background the node can take more than
+  5 seconds to answer; the pages now show its last values with their age.
+- The status page says when a newer release has been published.
+- After an update that brings a new kernel, the status and update pages say that a reboot is needed.
+- The setup code can be chosen at creation time with cloud-init user data (`/etc/node-setup-code`),
+  so the console is not needed; `docs/install.md` has the two lines.
+- `/etc/datum-node-image/image.json` and the update page carry the release name.
+- The gateway's first start no longer logs "tr: write error: Broken pipe".
+
 ## v2026.11.1-rc3 (2026-11-13)
 
 rc2 was tested on a DigitalOcean droplet and not published: two things showed there.

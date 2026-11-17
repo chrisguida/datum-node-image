@@ -52,7 +52,7 @@ disk is lost. About 5 minutes.
    `-o StrictHostKeyChecking=no`.
 3. Clear the old partition table's backup copy at the end of the disk, then write the image
    and read it back (the byte count is the raw image's size from `SHA256SUMS`' file list;
-   for v2026.11.1-rc3 it is 5474615296):
+   for v2026.11.1-rc4 it is 5474615296):
 
        ssh root@<IP> 'S=$(blockdev --getsz /dev/vda); dd if=/dev/zero of=/dev/vda bs=512 seek=$((S-4096)) count=4096 status=none'
        zcat datum-node-image-generic-<commit>.img.gz | ssh root@<IP> 'dd of=/dev/vda bs=4M conv=fsync status=none; head -c <raw size> /dev/vda | sha256sum'
@@ -108,6 +108,24 @@ documents custom images for the Toronto region only.
 Source: [LunaNode images](https://www.lunanode.com/features/images),
 [LunaNode API: images](https://www.lunanode.com/api/image).
 
+## Choosing the setup code yourself
+
+The setup page asks for a setup code so that the first stranger to find the new machine's
+address cannot claim it. By default the code is random and shown on the machine's console.
+To skip the console, choose the code when you create the machine: paste this as **user data**
+(DigitalOcean: *Advanced Options → Add Initialization scripts*; Vultr: *Cloud-Init User-Data*;
+most providers have the field), with your own code of 6 or more letters and digits:
+
+    #cloud-config
+    write_files:
+      - path: /etc/node-setup-code
+        permissions: '0644'
+        content: MY-OWN-CODE-2026
+
+The setup page then accepts that code (upper or lower case, dashes ignored). It is only used
+once: after setup the page asks for your password. If the provider did not deliver the user
+data, the console code still works.
+
 ## After the first boot
 
 The same checks on every provider. Power-on to usable on a 2 vCPU / 4 GB machine, measured
@@ -135,9 +153,10 @@ minute.
    minutes), then the load (15 to 20 minutes), then the gateway starting. The gateway logs
    "Could not fetch new template" and "Did not see an initial stratum job" until the node
    has caught up to the chain tip; that is expected. The stratum port (23334) opens with
-   the first job. During the days of background validation `/status` sometimes shows "The
-   node is busy (it is loading the snapshot)" with zeros, and `/update` "The node is not
-   reachable": the node took more than 5 seconds to answer. Refresh the page.
+   the first job. During the days of background validation the node is sometimes slow to
+   answer; `/status` then shows its last values and says how old they are. (Images before
+   v2026.11.1-rc4 showed "The node is busy (it is loading the snapshot)" with zeros instead;
+   refresh the page.)
 5. **Update page.** `/update` shows *Built from (git revision)* equal to the release's
    commit, *Image variant* `generic` or `generic-qcow2`, and *Running* `official`
    (Bitcoin Knots 29.5). There is one Knots build in this release, so no *Switch* button.
