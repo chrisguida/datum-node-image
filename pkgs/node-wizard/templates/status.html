@@ -3,13 +3,15 @@
 {{template "nav" .}}
 <main>
 {{$s := .Status}}
+{{if .RebootRequired}}<div class="card"><div class="ok" style="background:#fff4e0;color:#8a5a00">{{.T "reboot_required"}}</div></div>{{end}}
+{{if .UpdateTag}}<div class="card"><div class="ok">{{printf (.T "update_available") .UpdateTag}} <a href="/update">{{.T "update_open"}}</a></div></div>{{end}}
 <div class="card">
 <h1>{{.T "status_heading"}}</h1>
 
 <h2>{{.T "node"}}
 {{if eq $s.Node.Active "active"}}<span class="good">· {{.T "running"}}</span>{{else}}<span class="bad">· {{.T "stopped"}} ({{$s.Node.Active}})</span>{{end}}
 </h2>
-{{if $s.Node.Busy}}<div class="ok" style="background:#fff4e0;color:#8a5a00">{{.T "node_busy"}}</div>{{else if $s.Node.Error}}<div class="err">{{$s.Node.Error}}</div>{{end}}
+{{if $s.Node.Stale}}<div class="ok" style="background:#fff4e0;color:#8a5a00">{{printf (.T "node_stale") $s.Node.AgeSeconds}}</div>{{else if $s.Node.Busy}}<div class="ok" style="background:#fff4e0;color:#8a5a00">{{$s.BusyNote}}</div>{{else if $s.Node.Error}}<div class="err">{{$s.Node.Error}}</div>{{end}}
 <div class="row"><span class="k">{{.T "sync"}}</span><span class="v">{{$s.ProgressPct}}%</span></div>
 <div class="bar"><div style="width:{{$s.ProgressPct}}%"></div></div>
 <p class="note">{{if $s.Synced}}<span class="good">{{.T "synced"}}</span>{{else}}{{.T "syncing"}}{{end}}</p>

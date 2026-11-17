@@ -171,6 +171,8 @@ in
           "-http-listen :${toString cfg.httpPort}"
           "-dashboard-listen :${toString cfg.dashboardPort}"
           "-console-devices ${lib.concatStringsSep "," cfg.consoleDevices}"
+          # a setup code the owner chose before first boot (cloud-init write_files), see docs/install.md
+          "-setup-code-preset /etc/node-setup-code"
           "-fast-start-progress ${bitcoind.dataDir}/fast-start/progress.json"
           "-knots-builds /etc/datum-node-image/knots-builds.json"
           "-knots-selector ${node.knotsBuildSelector or "${settingsDir}/knots-build"}"

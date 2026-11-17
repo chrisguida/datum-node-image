@@ -38,6 +38,7 @@ type knotsBuildsFile struct {
 
 // /etc/datum-node-image/image.json
 type imageInfo struct {
+	Version           string `json:"version"` // the release this image is, from the changelog; "" before v2026.11.1-rc4
 	Rev               string `json:"rev"`
 	Variant           string `json:"variant"`
 	SnapshotHeight    int64  `json:"snapshotHeight"`
@@ -128,7 +129,31 @@ type snapshotState struct {
 	Height    int64  // 0 when unknown
 }
 
+// snapCache keeps the last snapshot state the node reported, for the minutes in which the node
+// is too slow to answer. The state only moves forward (active, validated, gone), so an old
+// answer never offers a switch that a fresh one would refuse.
+type snapCache struct {
+	mu sync.Mutex
+	st snapshotState
+	at time.Time
+}
+
 func (a *App) snapshotState(img imageInfo) snapshotState {
+	st := a.fetchSnapshotState(img)
+	c := &a.snapCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if st.Reachable {
+		c.st, c.at = st, time.Now()
+		return st
+	}
+	if !c.at.IsZero() && time.Since(c.at) < 15*time.Minute && systemdActive(a.cfg.BitcoindUnit) == "active" {
+		return c.st
+	}
+	return st
+}
+
+func (a *App) fetchSnapshotState(img imageInfo) snapshotState {
 	var st snapshotState
 	res, err := a.rpc("getchainstates")
 	if err != nil {
@@ -216,11 +241,105 @@ type releaseView struct {
 }
 
 type releaseCache struct {
-	mu    sync.Mutex
-	at    time.Time
-	val   []releaseView
-	err   string
-	errAt time.Time
+	mu         sync.Mutex
+	at         time.Time
+	val        []releaseView
+	err        string
+	errAt      time.Time
+	refreshing bool
+}
+
+// releasesCached is releases for pages that must not wait for GitHub: it returns what is
+// known now and refreshes in the background when that is older than ten minutes.
+func (a *App) releasesCached() []releaseView {
+	if a.cfg.ReleasesURL == "" {
+		return nil
+	}
+	c := a.releaseCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.refreshing && time.Since(c.at) > 10*time.Minute && time.Since(c.errAt) > 2*time.Minute {
+		c.refreshing = true
+		go func() {
+			val, err := fetchReleases(a.cfg.ReleasesURL)
+			c.mu.Lock()
+			if err != nil {
+				c.err, c.errAt = err.Error(), time.Now()
+			} else {
+				c.val, c.at, c.err = val, time.Now(), ""
+			}
+			c.refreshing = false
+			c.mu.Unlock()
+		}()
+	}
+	return c.val
+}
+
+// relVersion is a release tag vYEAR.MONTH.N or vYEAR.MONTH.N-rcK; a final release sorts
+// after its candidates.
+type relVersion struct{ y, m, n, rc int }
+
+var relVersionPattern = regexp.MustCompile(`^v(\d{1,9})\.(\d{1,9})\.(\d{1,9})(?:-rc(\d{1,9}))?$`)
+
+func parseRelVersion(s string) (relVersion, bool) {
+	m := relVersionPattern.FindStringSubmatch(s)
+	if m == nil {
+		return relVersion{}, false
+	}
+	v := relVersion{rc: 1 << 30}
+	v.y, _ = strconv.Atoi(m[1])
+	v.m, _ = strconv.Atoi(m[2])
+	v.n, _ = strconv.Atoi(m[3])
+	if m[4] != "" {
+		v.rc, _ = strconv.Atoi(m[4])
+	}
+	return v, true
+}
+
+func (v relVersion) less(o relVersion) bool {
+	a, b := [4]int{v.y, v.m, v.n, v.rc}, [4]int{o.y, o.m, o.n, o.rc}
+	for i := range a {
+		if a[i] != b[i] {
+			return a[i] < b[i]
+		}
+	}
+	return false
+}
+
+// newerRelease names the newest published release that is newer than the running one, or "".
+// A node on a final release is not pointed at release candidates.
+func newerRelease(running string, rels []releaseView) string {
+	cur, ok := parseRelVersion(running)
+	if !ok {
+		return ""
+	}
+	onCandidate := cur.rc != 1<<30
+	best, tag := cur, ""
+	for _, r := range rels {
+		v, ok := parseRelVersion(r.Tag)
+		if !ok || (r.Prerelease && !onCandidate) {
+			continue
+		}
+		if best.less(v) {
+			best, tag = v, r.Tag
+		}
+	}
+	return tag
+}
+
+// rebootRequired reports whether the installed system has another kernel than the running one:
+// an update switches everything but the kernel, which waits for a reboot.
+var systemLinks = [2]string{"/run/booted-system", "/run/current-system"}
+
+func rebootRequired() bool {
+	for _, f := range []string{"kernel", "kernel-modules"} {
+		booted, err1 := os.Readlink(systemLinks[0] + "/" + f)
+		current, err2 := os.Readlink(systemLinks[1] + "/" + f)
+		if err1 == nil && err2 == nil && booted != current {
+			return true
+		}
+	}
+	return false
 }
 
 // releases lists the repository's releases; the result is cached for ten minutes, a
@@ -381,6 +500,7 @@ type knotsBuildView struct {
 }
 
 type updateView struct {
+	Version     string
 	Rev         string
 	Variant     string
 	SnapshotPin string
@@ -438,7 +558,7 @@ func stateLabel(lang, state string) string {
 
 func (a *App) updateView(lang string) *updateView {
 	img := a.imageInfo()
-	v := &updateView{Rev: img.Rev, Variant: img.Variant}
+	v := &updateView{Version: img.Version, Rev: img.Rev, Variant: img.Variant}
 	if img.SnapshotHeight > 0 {
 		v.SnapshotPin = fmt.Sprintf("%d (%s)", img.SnapshotHeight, img.SnapshotBlockhash)
 	}
@@ -502,6 +622,7 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	pd.Update = a.updateView(pd.Lang)
+	pd.RebootRequired = rebootRequired()
 	a.render(w, "update", pd)
 }
 

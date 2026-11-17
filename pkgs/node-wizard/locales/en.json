@@ -146,5 +146,11 @@
   "err_guard": "That build cannot run with the node's current snapshot.",
   "err_restart": "Could not restart the node: %s",
   "err_start_update": "Could not start the updater: %s",
-  "session_lost": "Could not read the update status (the page may have been signed out). Sign in again to keep watching."
+  "session_lost": "Could not read the update status (the page may have been signed out). Sign in again to keep watching.",
+  "node_busy_plain": "The node has not answered yet; this page catches up on the next refresh.",
+  "node_stale": "The node is slow to answer right now, usually because it is validating old blocks in the background. These values are from %d seconds ago.",
+  "update_available": "A newer release is available: %s.",
+  "update_open": "Open the Update page",
+  "reboot_required": "This system was updated to a new kernel, which starts running after a reboot. Restart the machine from your provider's panel, or run \"reboot\" over SSH; the node and the gateway are down for a minute or two.",
+  "image_version": "Release"
 }

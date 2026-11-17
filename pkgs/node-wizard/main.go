@@ -53,6 +53,7 @@ type config struct {
 	HTTPListen      string
 	ConsoleDevices  []string
 	SetupCodeFile   string
+	SetupCodePreset string
 	DashboardListen string
 	SampleInterval  time.Duration
 	FastStartFile   string
@@ -110,6 +111,8 @@ type App struct {
 	hashrate     *hashrateLog
 	poolCache    *poolStatsCache
 	releaseCache *releaseCache
+	nodeCache    nodeCache
+	snapCache    snapCache
 }
 
 type pageData struct {
@@ -126,6 +129,10 @@ type pageData struct {
 	SetupDone     bool
 	DashboardURL  string
 	Pool          *poolStatsView
+	// a published release newer than this image; empty when there is none
+	UpdateTag string
+	// the running kernel is older than the installed system's
+	RebootRequired bool
 	HashrateSVG   template.HTML
 	Update        *updateView
 }
@@ -142,6 +149,7 @@ type statusView struct {
 	GatewayWaitingSync bool
 	FastStartLine      string
 	FastStartPct       int // -1 when no bar applies
+	BusyNote           string
 }
 
 var (
@@ -166,7 +174,8 @@ func main() {
 	flag.StringVar(&cfg.Listen, "listen", ":443", "HTTPS listen address")
 	flag.StringVar(&cfg.HTTPListen, "http-listen", ":80", "HTTP listen address (redirects to HTTPS); empty disables")
 	flag.StringVar(&consoles, "console-devices", "/dev/tty1,/dev/ttyS0", "where to print the setup code")
-	flag.StringVar(&cfg.SetupCodeFile, "setup-code-file", "", "file holding a pre-set setup code (e.g. from cloud-init); default <state-dir>/setup-code")
+	flag.StringVar(&cfg.SetupCodeFile, "setup-code-file", "", "where the setup code is kept; default <state-dir>/setup-code")
+	flag.StringVar(&cfg.SetupCodePreset, "setup-code-preset", "", "file with a setup code chosen by the owner before first boot (cloud-init write_files); read until setup is done")
 	flag.StringVar(&cfg.DashboardListen, "dashboard-listen", ":7443", "HTTPS listen address for the proxied gateway dashboard; empty disables")
 	flag.DurationVar(&cfg.SampleInterval, "sample-interval", 60*time.Second, "how often the gateway hashrate is sampled for the chart")
 	flag.StringVar(&cfg.FastStartFile, "fast-start-progress", "/var/lib/bitcoind-blake2b/fast-start/progress.json", "progress file of the assumeutxo fast start; empty disables")
@@ -213,6 +222,7 @@ func main() {
 	if err := app.ensureSetupCode(); err != nil {
 		log.Fatal(err)
 	}
+	app.adoptPresetCode()
 	certFile, keyFile, err := app.ensureTLS()
 	if err != nil {
 		log.Fatal(err)
@@ -338,6 +348,41 @@ func (a *App) loadPools() error {
 	return nil
 }
 
+// adoptPresetCode takes over a setup code the owner put on the machine before first boot
+// (cloud-init user-data writing the preset file). cloud-init may write it after this service
+// started, so the file is looked at again until setup is done.
+func (a *App) adoptPresetCode() {
+	if a.cfg.SetupCodePreset == "" {
+		return
+	}
+	b, err := os.ReadFile(a.cfg.SetupCodePreset)
+	if err != nil {
+		return
+	}
+	code := normalizeCode(string(b))
+	if len(code) < 6 || len(code) > 64 {
+		return
+	}
+	a.mu.Lock()
+	changed := code != a.setupCode && !a.state.SetupDone
+	if changed {
+		a.setupCode = code
+	}
+	a.mu.Unlock()
+	if changed {
+		if err := atomicWrite(a.cfg.SetupCodeFile, []byte(code+"\n"), 0o600); err != nil {
+			log.Printf("setup code: %v", err)
+		}
+		log.Printf("setup code taken from %s", a.cfg.SetupCodePreset)
+	}
+}
+
+func (a *App) currentSetupCode() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.setupCode
+}
+
 func (a *App) ensureSetupCode() error {
 	if b, err := os.ReadFile(a.cfg.SetupCodeFile); err == nil {
 		code := normalizeCode(string(b))
@@ -361,7 +406,7 @@ func normalizeCode(s string) string {
 }
 
 func (a *App) setupCodeDisplay() string {
-	c := a.setupCode
+	c := a.currentSetupCode()
 	if len(c) == 8 {
 		return c[:4] + "-" + c[4:]
 	}
@@ -636,7 +681,8 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 		pd.Lang = l
 		setCookie(w, "lang", l, 365*86400, false)
 	}
-	if normalizeCode(r.FormValue("setup_code")) != a.setupCode {
+	a.adoptPresetCode()
+	if normalizeCode(r.FormValue("setup_code")) != a.currentSetupCode() {
 		a.limiter.fail(key, 5, 10*time.Minute)
 		pd.Error = pd.T("err_code")
 		a.render(w, "setup", pd)
@@ -743,6 +789,11 @@ func (a *App) statusView(host, lang string) *statusView {
 		v.GatewayWaitingSync = true
 	}
 	v.FastStartLine = fastStartLine(lang, s)
+	// only a snapshot load is named as the reason; any other wait is just the node being slow
+	v.BusyNote = tr(lang, "node_busy_plain")
+	if s.FastStart != nil && s.FastStart.Phase == "loading" {
+		v.BusyNote = tr(lang, "node_busy")
+	}
 	v.FastStartPct = -1
 	if s.FastStart != nil && (s.FastStart.Phase == "downloading" || s.FastStart.Phase == "loading") {
 		v.FastStartPct = s.FastStart.Percent
@@ -753,6 +804,8 @@ func (a *App) statusView(host, lang string) *statusView {
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	pd := a.page(w, r)
 	pd.Status = a.statusView(pd.Host, pd.Lang)
+	pd.UpdateTag = newerRelease(a.imageInfo().Version, a.releasesCached())
+	pd.RebootRequired = rebootRequired()
 	pd.Pool = a.poolStatsView(pd.Lang)
 	pd.HashrateSVG = a.hashrateSVG()
 	pd.DashboardURL = a.dashboardURL(pd.Host)

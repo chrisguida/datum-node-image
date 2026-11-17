@@ -20,6 +20,7 @@ buildGoModule {
       ./hashrate.go
       ./dashboard.go
       ./update.go
+      ./update_test.go
       ./locales
       ./templates
     ];

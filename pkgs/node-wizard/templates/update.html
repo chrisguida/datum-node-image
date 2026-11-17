@@ -6,7 +6,9 @@
 <h1>{{.T "update_heading"}}</h1>
 {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
 {{if .Notice}}<div class="ok">{{.Notice}}</div>{{end}}
+{{if .RebootRequired}}<div class="ok" style="background:#fff4e0;color:#8a5a00">{{.T "reboot_required"}}</div>{{end}}
 <h2>{{.T "image"}}</h2>
+{{if $u.Version}}<div class="row"><span class="k">{{.T "image_version"}}</span><span class="v">{{$u.Version}}</span></div>{{end}}
 <div class="row"><span class="k">{{.T "image_rev"}}</span><span class="v"><code>{{$u.Rev}}</code></span></div>
 <div class="row"><span class="k">{{.T "image_variant"}}</span><span class="v">{{$u.Variant}}</span></div>
 <div class="row"><span class="k">{{.T "image_snapshot"}}</span><span class="v">{{if $u.SnapshotPin}}{{$u.SnapshotPin}}{{else}}{{.T "image_snapshot_none"}}{{end}}</span></div>

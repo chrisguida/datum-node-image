@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -29,7 +30,10 @@ type nodeStatus struct {
 	Snapshot   bool  `json:"snapshot"`
 	Background int64 `json:"background_blocks"`
 	Busy     bool    `json:"busy"`
-	Error    string  `json:"error,omitempty"`
+	// the node did not answer in time; the values are the last ones it gave, AgeSeconds ago
+	Stale      bool   `json:"stale"`
+	AgeSeconds int    `json:"age_seconds,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 type gatewayStatus struct {
@@ -70,6 +74,12 @@ func systemdActive(unit string) string {
 
 // rpc calls bitcoind with the cookie the node profile makes group-readable.
 func (a *App) rpc(method string, params ...any) (json.RawMessage, error) {
+	return a.rpcT(10*time.Second, method, params...)
+}
+
+// rpcT is rpc with its own time limit. While bitcoind validates the old history in the
+// background it holds its main lock for seconds at a time, and getblockchaininfo waits for it.
+func (a *App) rpcT(limit time.Duration, method string, params ...any) (json.RawMessage, error) {
 	cookie, err := os.ReadFile(a.cfg.BitcoindCookie)
 	if err != nil {
 		return nil, fmt.Errorf("cookie: %w", err)
@@ -88,7 +98,7 @@ func (a *App) rpc(method string, params ...any) (json.RawMessage, error) {
 	}
 	req.SetBasicAuth(user, pass)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := a.httpClient.Do(req)
+	resp, err := (&http.Client{Timeout: limit}).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -108,16 +118,88 @@ func (a *App) rpc(method string, params ...any) (json.RawMessage, error) {
 	return out.Result, nil
 }
 
+// nodeCache holds the node's last answer. The node can take longer to answer than a page
+// should take to load, so pages read this cache: a refresh runs in the background, a page
+// waits a few seconds for it, and otherwise shows the last values with their age.
+type nodeCache struct {
+	mu       sync.Mutex
+	st       nodeStatus
+	at       time.Time // of the last answer; zero when there is none since the node last failed
+	err      string
+	timedOut bool
+	inflight chan struct{}
+}
+
+const (
+	nodeFresh    = 5 * time.Second  // an answer newer than this is served as it is
+	nodeWait     = 4 * time.Second  // how long a page waits for a refresh
+	nodeStale    = 30 * time.Second // an older answer is shown with its age
+	nodeRPCLimit = 30 * time.Second // per call, in the background refresh
+)
+
+func isTimeout(err error) bool {
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	return strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "timeout")
+}
+
 func (a *App) nodeStatus() nodeStatus {
-	st := nodeStatus{Active: systemdActive(a.cfg.BitcoindUnit)}
-	res, err := a.rpc("getblockchaininfo")
-	if err != nil {
-		// a snapshot load holds bitcoind's main lock during its flushes; RPC calls then time out
-		if strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "timeout") {
-			st.Busy = true
+	active := systemdActive(a.cfg.BitcoindUnit)
+	c := &a.nodeCache
+	c.mu.Lock()
+	if c.inflight == nil && time.Since(c.at) > nodeFresh {
+		ch := make(chan struct{})
+		c.inflight = ch
+		prev := c.st
+		go func() {
+			st, err := a.fetchNodeStatus(prev)
+			c.mu.Lock()
+			switch {
+			case err == nil:
+				c.st, c.at, c.err, c.timedOut = st, time.Now(), "", false
+			case isTimeout(err):
+				// a snapshot load or background validation holds bitcoind's main lock; keep the last answer
+				c.err, c.timedOut = err.Error(), true
+			default:
+				c.st, c.at, c.err, c.timedOut = nodeStatus{}, time.Time{}, err.Error(), false
+			}
+			c.inflight = nil
+			c.mu.Unlock()
+			close(ch)
+		}()
+	}
+	ch := c.inflight
+	c.mu.Unlock()
+	if ch != nil {
+		select {
+		case <-ch:
+		case <-time.After(nodeWait):
 		}
-		st.Error = err.Error()
-		return st
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	st := c.st
+	st.Active = active
+	switch {
+	case c.at.IsZero():
+		st.Error = c.err
+		st.Busy = c.timedOut || (c.inflight != nil && c.err == "")
+	case time.Since(c.at) > nodeStale:
+		st.Stale = true
+		st.AgeSeconds = int(time.Since(c.at).Seconds())
+	}
+	return st
+}
+
+// fetchNodeStatus asks the node. prev supplies the values of the two secondary calls when
+// one of them fails after getblockchaininfo answered.
+func (a *App) fetchNodeStatus(prev nodeStatus) (nodeStatus, error) {
+	st := nodeStatus{Snapshot: prev.Snapshot, Background: prev.Background, Peers: prev.Peers}
+	res, err := a.rpcT(nodeRPCLimit, "getblockchaininfo")
+	if err != nil {
+		return st, err
 	}
 	var bci struct {
 		Headers  int64   `json:"headers"`
@@ -126,18 +208,20 @@ func (a *App) nodeStatus() nodeStatus {
 		IBD      bool    `json:"initialblockdownload"`
 	}
 	if err := json.Unmarshal(res, &bci); err != nil {
-		st.Error = err.Error()
-		return st
+		return st, err
 	}
 	st.Headers, st.Blocks, st.Progress, st.IBD = bci.Headers, bci.Blocks, bci.Progress, bci.IBD
-	if res, err := a.rpc("getchainstates"); err == nil {
+	if res, err := a.rpcT(nodeRPCLimit, "getchainstates"); err == nil {
 		var cs struct {
 			Chainstates []struct {
 				Blocks            int64  `json:"blocks"`
 				SnapshotBlockhash string `json:"snapshot_blockhash"`
 			} `json:"chainstates"`
 		}
-		if json.Unmarshal(res, &cs) == nil && len(cs.Chainstates) == 2 {
+		if json.Unmarshal(res, &cs) == nil {
+			st.Snapshot, st.Background = false, 0
+		}
+		if len(cs.Chainstates) == 2 {
 			st.Snapshot = true
 			for _, c := range cs.Chainstates {
 				if c.SnapshotBlockhash == "" {
@@ -146,7 +230,7 @@ func (a *App) nodeStatus() nodeStatus {
 			}
 		}
 	}
-	if res, err := a.rpc("getnetworkinfo"); err == nil {
+	if res, err := a.rpcT(nodeRPCLimit, "getnetworkinfo"); err == nil {
 		var ni struct {
 			Connections int `json:"connections"`
 		}
@@ -154,7 +238,7 @@ func (a *App) nodeStatus() nodeStatus {
 			st.Peers = ni.Connections
 		}
 	}
-	return st
+	return st, nil
 }
 
 func (a *App) gatewayStatus() gatewayStatus {
@@ -370,6 +454,7 @@ func (a *App) consoleLoop() {
 		if done {
 			return
 		}
+		a.adoptPresetCode()
 		msg := fmt.Sprintf("\r\n\r\n================ NODE SETUP ================\r\n"+
 			"  Open in a browser:  https://%s/\r\n"+
 			"  SETUP CODE:         %s\r\n"+

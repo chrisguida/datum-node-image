@@ -12,9 +12,20 @@
 let
   cfg = config.datum-node-image;
   fastStart = config.services.blake2b-node.fastStart or { };
+  # the first "## v..." heading of the changelog names the release this tree is (or follows)
+  changelogHeading = lib.findFirst (l: lib.hasPrefix "## v" l) null (
+    lib.splitString "\n" (builtins.readFile ../CHANGELOG.md)
+  );
 in
 {
   options.datum-node-image = {
+    version = lib.mkOption {
+      type = lib.types.str;
+      default =
+        if changelogHeading == null then "unknown" else builtins.elemAt (lib.splitString " " changelogHeading) 1;
+      description = "Release tag this system corresponds to; the setup page compares it with the published releases.";
+    };
+
     rev = lib.mkOption {
       type = lib.types.str;
       default = "unknown";
@@ -43,7 +54,7 @@ in
 
   config.environment.etc."datum-node-image/image.json".text = builtins.toJSON (
     {
-      inherit (cfg) rev variant;
+      inherit (cfg) version rev variant;
     }
     // lib.optionalAttrs (fastStart.enable or false) {
       snapshotHeight = fastStart.height;
